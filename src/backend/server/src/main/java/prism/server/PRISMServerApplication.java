@@ -8,6 +8,7 @@ import org.eclipse.jetty.servlets.CrossOriginFilter;
 import org.glassfish.jersey.media.multipart.MultiPartFeature;
 import prism.cli.SchedulerConverter;
 import prism.cli.StatisticalChecker;
+import prism.cli.whatiftest;
 import prism.resources.ModelResource;
 import prism.resources.TaskResource;
 
@@ -32,6 +33,7 @@ public class PRISMServerApplication extends Application<PRISMServerConfiguration
 	public void initialize(Bootstrap<PRISMServerConfiguration> bootstrap) {
 		bootstrap.addCommand(new SchedulerConverter());
 		bootstrap.addCommand(new StatisticalChecker());
+		bootstrap.addCommand(new whatiftest());
 	}
 
 	@Override

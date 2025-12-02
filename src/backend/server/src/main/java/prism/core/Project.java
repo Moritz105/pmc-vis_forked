@@ -271,6 +271,10 @@ public class Project implements Namespace{
         }
     }
 
+    public Set<File> getPropertyFiles() {
+        return propertyFiles;
+    }
+
 //    public TreeMap<String, String> modelCheckAllStatistical(long maxPathLength, String simulationMethod, boolean parallel, Optional<String> schedulerName) throws Exception {
 //        TreeMap<String, String> info = new TreeMap<>();
 //

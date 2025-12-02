@@ -20,12 +20,15 @@ public class Graph {
 
     private Info info;
 
+    private List<State> states;
+
     public Graph(){
         // Jackson deserialization
     }
 
     public Graph(Model model, List<State> states, List<Transition> transitions) {
         this.info = model.getInformation();
+        this.states = states;
         this.nodes = new ArrayList<>(states);
         this.nodes.addAll(transitions);
         this.edges = new ArrayList<>();
@@ -50,5 +53,11 @@ public class Graph {
     @JsonProperty
     public Info getInfo() {
         return info;
+    }
+
+    @Schema(description = "States without transitions")
+    @JsonProperty
+    public List<State> getStates() {
+        return states;
     }
 }

@@ -1,0 +1,49 @@
+mdp
+
+const double weight1_1 = 1/4;
+const double weight1_2 = 1/4;
+const double weight1_3 = 1/4;
+const double weight1_4 = 1/4;
+
+const double weight2_1 = 1/10;
+const double weight2_2 = 2/10;
+const double weight2_3 = 2/10;
+const double weight2_4 = 5/10;
+
+init
+    (current_side1 = 0) & (current_side2 = 0)
+endinit
+
+
+module dice1
+
+    distribution1: [1..2]; // What weight distribution the die has
+    current_side1: [0..4]; // 0 stands for not rolled
+
+    [roll1] (current_side1 = 0) & (distribution1=1) -> weight1_1: (current_side1'=1) + 
+                                                      weight1_2: (current_side1'=2) + 
+                                                      weight1_3: (current_side1'=3) + 
+                                                      weight1_4: (current_side1'=4);
+
+    [roll1] (current_side1 = 0) & (distribution1=2) -> weight2_1: (current_side1'=1) + 
+                                                      weight2_2: (current_side1'=2) + 
+                                                      weight2_3: (current_side1'=3) + 
+                                                      weight2_4: (current_side1'=4);
+
+    [reset] (current_side1 != 0) -> (current_side1'=0);
+    
+endmodule
+
+module dice2=dice1 [
+    current_side1=current_side2, 
+    distribution1=distribution2,
+    roll1=roll2
+    ] endmodule
+
+label "rolled" = (current_side1 != 0) & (current_side2 != 0);
+
+formula sum = current_side1 + current_side2;
+
+rewards "value"
+    [reset] true : sum;
+endrewards

@@ -1,0 +1,5 @@
+"Min_Exp_Value": R{"value"}min=? [F ("rolled" & (X true))];
+"Max_Exp_Value": R{"value"}max=? [F ("rolled" & (X true))];
+
+"Pmin_Win" : Pmin=? [(! "rolled") U (sum>5)]
+"Pmax_Win" : Pmax=? [(! "rolled") U (sum>5)]

@@ -75,6 +75,10 @@ public class ModelParser {
         }
     }
 
+    public ModulesFile getModulesFile() {
+        return modulesFile;
+    }
+
     public String normalizeStateName(String stateDescription) {
         String intern = stateDescription.replace(" ", "");
 
@@ -519,6 +523,10 @@ public class ModelParser {
         }
 
         return new Graph(parent, outStates, transitions);
+    }
+
+    public Model getParent() {
+        return parent;
     }
 
 

@@ -313,7 +313,7 @@ public class Model implements Namespace {
     public void loadPropertyFiles() throws Exception {
         boolean fileForModelCheckingFound = false;
         for (File file : Objects.requireNonNull(new File(parent.getPath()).listFiles())) {
-            if (!Namespace.FILES_RESERVED.contains(file.getName())) {
+            if (!Namespace.FILES_RESERVED.contains(file.getName()) && file.getName().endsWith(".props")) {
                 fileForModelCheckingFound = true;
                 if (this.debug) {
                     System.out.println("Property File: " + file);
