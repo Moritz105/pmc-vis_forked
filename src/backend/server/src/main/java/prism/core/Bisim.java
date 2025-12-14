@@ -34,7 +34,17 @@ public class Bisim{
         this.model=model;
     }
 
-    public void bisimulate(Model model){
-        
+    public void bisimulate(Graph graph){
+        //Zuständen ihren Labels entsprechned in Blöcke einteilen
+        //Map<int,List<State>> blocks = new Map<int,List<State>>();
+        //for (State state in graph.getStates()){
+            // eher über parserstates mittels utility updater, anwendung beim modelparser/-checker anschauen
+            // model hat getlabels funktion
+
+        //}
+        //Für jede Aktion a:
+        //  prüfe, ob jeder Zustand bei Ausführung von Aktion a in gleichen Block übergeht
+        //      wenn verschiedene oder gar keine Transition -> splitte Blöcke
+        // wann fertig?
     }
 }

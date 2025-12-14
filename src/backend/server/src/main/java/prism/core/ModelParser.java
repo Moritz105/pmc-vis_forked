@@ -405,7 +405,7 @@ public class ModelParser {
                 for (int j = 0; j < choice.size(); j++) {
                     double probability = choice.getProbability(j);
                     parser.State target = choice.computeTarget(j, state, modulesFile.createVarList());
-                    if (!states.contains(target) | visited.contains(target)) {
+                    if (!(states.contains(target) | visited.contains(target))) {
                         states.add(target);
                     }
                     probabilities.put(target, probability);

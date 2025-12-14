@@ -27,7 +27,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Objects;
 import java.util.Optional;
- 
+
 public class Diff {
     Project project;
     ModelParser parserleft;
@@ -57,38 +57,61 @@ public class Diff {
         this.start = (Map<String,VariableInfo>) left.getInfo().getStateEntry(Namespace.OUTPUT_VARIABLES);
         this.comp = (Map<String,VariableInfo>) right.getInfo().getStateEntry(Namespace.OUTPUT_VARIABLES);
         //bekomme ich hier die richtige Map? weil info ein zweites Mal neu definiert wird
-
+        Map<String, List<String>> mapping = new HashMap<>();
 
         for (Map.Entry entry : start.entrySet()) {
             VariableInfo s_var = (VariableInfo) entry.getValue();
-            for (Map.Entry entrie : comp.entrySet()){
+            for (Map.Entry entrie : comp.entrySet()) {
                 VariableInfo c_var = (VariableInfo) entrie.getValue();
-                boolean min=false;
-                boolean max=false;
-                if (s_var.getType()==c_var.getType()) {
-                    System.out.println("Var " + s_var.getVariableName() + c_var.getVariableName() + " gleicher Typ");
-                    if (s_var.getMin()==c_var.getMin()) {
-                        System.out.println("Var gleiche min: " + s_var.getMin());
-                        min=true;
+
+                if (s_var.getType() == c_var.getType()) {
+                    if (s_var.getMin() == c_var.getMin() && s_var.getMax() == c_var.getMax()) {
+                        mapping.computeIfAbsent(s_var.getVariableName(), k -> new ArrayList<>()).add(c_var.getVariableName());
+
                     }
-                    if (s_var.getMax()==c_var.getMax()) {
-                        System.out.println("Var gleiche max: " + s_var.getMax());
-                        max=true;
-                    }
-                    if (min&&max) {
-                        System.out.println("Variable " + s_var.getVariableName() + c_var.getVariableName() + " identisch");
-                    }
-                }else{System.out.println("Funktion als falsche if aufgeführt");}
+
+                } else {
+                    System.out.println("Keine mapbare Variable");
+                }
             }
 
-        } 
-        if (parserleft.getInitialNodes().getStates().size()==parserright.getInitialNodes().getStates().size()) {
+        }System.out.println(mapping);
+        //calc all possibilities
+        List<Map<String, String>> all_pos = getDistribution(mapping, new ArrayList<>(mapping.keySet()), 0, new HashMap<>(), new HashSet<>(), new ArrayList<>());
+        System.out.println(all_pos);
+
+        if (left.getInitialNodes().getStates().size()==right.getInitialNodes().getStates().size()) {
             System.out.println("Gleiche Anzahl an Startknoten");
         }
+        if (parserleft.getGraph().getTransitions().size()==parserright.getGraph().getTransitions().size()) {
+            System.out.println("Gleiche Anzahl an Transitions");
+        }
+        if (parserleft.getGraph().getStates().size()==parserright.getGraph().getStates().size()) {
+            System.out.println("Gleiche Anzahl an Knoten");
+        }
 
+    }
 
+    public List<Map<String, String>> getDistribution( Map<String, List<String>> mapping, List<String> elements, int index, Map<String, String> current, Set<String> visited, List<Map<String, String>> distributions){
+        elements.sort(Comparator.comparingInt(v -> mapping.get(v).size()));
 
-        
+        //terminante and add config if all var have been visited
+        if (index == elements.size()){
+            distributions.add(new HashMap<>(current));
+            return distributions;
+        }
+        String var = elements.get(index);
+
+        for (String check : mapping.get(var)){
+            if (visited.contains(check)) continue;
+            current.put(var, check);
+            visited.add(check);
+
+            getDistribution(mapping, elements, index+1, current, visited, distributions);
+
+            current.remove(var);
+            visited.remove(check);
+        }return distributions;
     }
         
 }

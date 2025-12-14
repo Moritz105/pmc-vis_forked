@@ -22,6 +22,8 @@ public class Graph {
 
     private List<State> states;
 
+    private List<Transition> transitions;
+
     public Graph(){
         // Jackson deserialization
     }
@@ -29,6 +31,7 @@ public class Graph {
     public Graph(Model model, List<State> states, List<Transition> transitions) {
         this.info = model.getInformation();
         this.states = states;
+        this.transitions = transitions;
         this.nodes = new ArrayList<>(states);
         this.nodes.addAll(transitions);
         this.edges = new ArrayList<>();
@@ -59,5 +62,11 @@ public class Graph {
     @JsonProperty
     public List<State> getStates() {
         return states;
+    }
+
+    @Schema(description = "Only transitions")
+    @JsonProperty
+    public List<Transition> getTransitions() {
+        return transitions;
     }
 }
