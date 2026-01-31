@@ -25,6 +25,8 @@ public class State implements Node{
 
     private TreeMap<String, AP> atomicPropositions;
 
+    private String diffColor = "none";
+
     public State(){
         // Jackson deserialization
     }
@@ -120,4 +122,8 @@ public class State implements Node{
     public Map<String, Object> getParameters() {
         return parameters;
     }
+
+    public String getDiffColor() {return diffColor;}
+
+    public void setDiffColor(String diffColor) {this.diffColor = diffColor;}
 }

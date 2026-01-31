@@ -108,11 +108,24 @@ public class ModelResource extends Resource {
     public Response getInitial(
             @Parameter(description = "identifier of project")
             @PathParam("project_id") String projectID,
-            @QueryParam("version") Optional<String> version
+            @QueryParam("version") String version
     ) {
         refreshProject(projectID);
-        if (version.isPresent()) return ok(tasks.getProject(projectID).getInitialNodes(version.get()));
-        return ok(tasks.getProject(projectID).getInitialNodes());
+        return ok(tasks.getProject(projectID).getInitialNodes(tasks.getProject(projectID).defaultVersion()));
+    }
+
+    @Path("/compare")
+    @GET
+    @Timed(name="compare")
+    @Operation(summary = "Returns all initial nodes of second model", description = "Returns all nodes that are marked as initial states for second model")
+    public Response getCompareInitial(
+            @Parameter(description = "identifier of project")
+            @PathParam("project_id") String projectID,
+            @QueryParam("version") String version
+    ) {
+        refreshProject(projectID);
+        return ok(tasks.getProject(projectID).getInitialNodes(tasks.getProject(projectID).getSecondV()));
+
     }
 
     @Path("/files")
@@ -140,6 +153,34 @@ public class ModelResource extends Resource {
     ) {
         refreshProject(projectID);
         return ok(tasks.getProject(projectID).getFileContent(fileID));
+    }
+
+    @Path("/fingerprints")
+    @GET
+    @Timed(name="fingerprints")
+    @Operation(summary = "Returns fingerprints for what if analysis", description = "Returns data for comparison of 2 graphs")
+    public Response getFingerprints (
+            @Parameter(description = "identifier of project")
+            @PathParam("project_id") String projectID
+    ) throws Exception{
+        refreshProject(projectID);
+
+        return ok(tasks.getProject(projectID).getFingerprints());
+
+    }
+
+    @Path("/coloredDiff")
+    @GET
+    @Timed(name="coloredDiff")
+    @Operation(summary = "Returns coloring for differences", description = "Returns different nodes of 2 graphs")
+    public Response getColoredDiff (
+            @Parameter(description = "identifier of project")
+            @PathParam("project_id") String projectID
+    ) throws Exception{
+        refreshProject(projectID);
+
+        return ok(tasks.getProject(projectID).getColoring());
+
     }
 
 //    @Path("/view:{type}")

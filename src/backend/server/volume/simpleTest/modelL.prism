@@ -1,0 +1,13 @@
+// model_l.prism
+mdp
+
+module M1
+    s : [0..3] init 0;
+
+    [go] s=0 -> (s'=1);
+    [a]  s=1 -> (s'=2);
+    [b]  s=1 -> 0.5:(s'=3) + 0.5:(s'=2); // Zwei Ausgänge für Aktion b
+
+    [loop] s=2 -> (s'=2);
+    [loop] s=3 -> (s'=3);
+endmodule

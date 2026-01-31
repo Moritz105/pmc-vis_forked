@@ -153,6 +153,7 @@ async function expandGraph(cy, nodes, onLayoutStopFn) {
       .map(d => ({
         group: 'nodes',
         data: setNeedsHTML(d),
+        diffColor: d.diffColor || 'none',
         // position: node.position()
         // WARNING: setting this prop makes nodes immutable, possible bug with cytoscape
       }))

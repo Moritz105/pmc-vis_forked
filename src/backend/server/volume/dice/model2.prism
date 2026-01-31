@@ -22,14 +22,14 @@ module dice1
 
     [roll1] (current_side1 = 0) & (distribution1=1) -> weight1_1: (current_side1'=1) + 
                                                       weight1_2: (current_side1'=2) + 
-                                                      weight1_3: (current_side1'=3) + 
-                                                      weight1_4: (current_side1'=4);
+                                                      (weight1_3 + weight1_4): (current_side1'=3);
+                                                      //+ weight1_4: (current_side1'=4);
 
     [roll1] (current_side1 = 0) & (distribution1=2) -> weight2_1: (current_side1'=1) + 
                                                       weight2_2: (current_side1'=2) + 
                                                       weight2_3: (current_side1'=3) + 
                                                       weight2_4: (current_side1'=4);
-
+    [roll1] (current_side1 = 2) -> (current_side1'=0);
     [reset] (current_side1 != 0) -> (current_side1'=0);
     
 endmodule

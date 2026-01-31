@@ -34,6 +34,7 @@ public class Project implements Namespace{
 
     private Map<String, Model> models;
     private String newestVersion;
+    private String secondNewestVersion;
 
     public static Project reset(Project original) throws Exception {
         return new Project(original.id, original.rootDir, original.taskManager, original.database, original.cuddMaxMem, original.numIterations, original.debug);
@@ -114,6 +115,11 @@ public class Project implements Namespace{
     public String createModel(File modelFile, String version) throws Exception {
         Model m = new Model(modelFile, version, this, debug);
         models.put(version, m);
+        if (newestVersion == null) {
+            this.secondNewestVersion = version;
+        }else{
+            this.secondNewestVersion = newestVersion;
+        }
         this.newestVersion = version;
         for (File f : propertyFiles) {
             m.loadPropertyFile(f);
@@ -273,6 +279,20 @@ public class Project implements Namespace{
 
     public Set<File> getPropertyFiles() {
         return propertyFiles;
+    }
+
+    public List<Map<String, String>> getFingerprints() throws Exception{
+        Diff diff = new Diff(this, models.get(secondNewestVersion), models.get(newestVersion));
+        return diff.getDistributions();
+    }
+
+    public String getSecondV (){return this.secondNewestVersion;}
+
+    public  Map<String, Model> getModels() {return this.models;}
+
+    public Map<String, List<String>> getColoring() throws Exception{
+        Diff diff = new Diff(this, models.get(secondNewestVersion), models.get(newestVersion));
+        return diff.matchNodes();
     }
 
 //    public TreeMap<String, String> modelCheckAllStatistical(long maxPathLength, String simulationMethod, boolean parallel, Optional<String> schedulerName) throws Exception {

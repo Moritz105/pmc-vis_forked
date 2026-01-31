@@ -32,6 +32,8 @@ import java.nio.file.Paths;
 import java.util.Objects;
 import java.util.Optional;
 import parser.ast.ModulesFile;
+import java.util.*;
+import java.util.stream.Collectors;
 
 
 public class whatiftest extends ConfiguredCommand<PRISMServerConfiguration> {
@@ -109,9 +111,42 @@ public class whatiftest extends ConfiguredCommand<PRISMServerConfiguration> {
         Model m1 = project.getModel("1");
         Model m2 = project.getModel("2");
 
-        Diff test = new Diff(project);
-        test.comparestructure(m1, m2);
+        Diff test = new Diff(project, m1, m2);
+        test.compareVariables();
+        System.out.println("test OK");
+        //System.out.println(project.getFingerprints());
+        //System.out.println(project.getModels());
+        //System.out.println(project.getModels().get(project.getSecondV()));
+        Map<String, List<String>> partitions = test.matchNodes();
+        System.out.println(partitions);
 
+        /*Map<String, List<String>> result = test.matchNodes();
+        List<String> green = result.get("green");
+        List<String> red = result.get("red");
+
+        String sample = "t99";
+        String rNode = "R_" + sample;
+        String lNode = "L_" + sample;
+
+        System.out.println("--- Partner-Verbleib-Check ---");
+        System.out.println("Ist " + rNode + " in Green? " + green.contains(rNode));
+        System.out.println("Ist " + lNode + " in Red? " + red.contains(lNode));
+
+// Jetzt suchen wir L_t99 in den "identischen" Listen
+        boolean foundInIdentical = false;
+        for (Map.Entry<String, List<String>> entry : result.entrySet()) {
+            if (!entry.getKey().equals("red") && !entry.getKey().equals("green")) {
+                if (entry.getValue().contains(lNode)) {
+                    System.out.println(lNode + " wurde gefunden in Block: " + entry.getKey());
+                    System.out.println("Inhalt dieses Blocks: " + entry.getValue());
+                    foundInIdentical = true;
+                }
+            }
+        }
+
+        if (!foundInIdentical) {
+            System.out.println(lNode + " ist verschollen! (Weder in Red, noch in Green, noch in Identisch)");
+        }*/
 
         project.removeFiles();
     }
