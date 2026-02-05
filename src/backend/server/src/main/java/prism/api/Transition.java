@@ -165,4 +165,6 @@ public class Transition implements Node{
         }
         return edges;
     }
+
+    public String getDiffColor() {return diffColor;}
 }

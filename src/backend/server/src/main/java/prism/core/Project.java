@@ -301,6 +301,9 @@ public class Project implements Namespace{
     public  Map<String, Model> getModels() {return this.models;}
 
     public Map<String, String> getColoring() throws Exception{
+        if (diff==null){
+            this.diff = new Diff(this, models.get(secondNewestVersion), models.get(newestVersion));
+        }
         return diff.matchNodes();
     }
 

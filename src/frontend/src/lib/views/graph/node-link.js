@@ -1,7 +1,7 @@
 import { _ } from 'lodash';
 import Swal from 'sweetalert2';
 
-import { info, BACKEND } from '../../main/main.js';
+import { info, BACKEND, SECONDV } from '../../main/main.js';
 import {
   colors,
   stylesheet,
@@ -47,6 +47,32 @@ let selectedPanesData = {
   selectedPanes: [],
   paneCy: null,
 };
+
+function overlayGraph(data1, data2){
+  console.log("Data1: " + data1)
+  console.log("Data2: " + data2)
+  const nodesM2 = data2.nodes
+    .map(n => ({
+      ...n,
+      origin: 'm2',
+    }));
+  console.log('nodesM": ', nodesM2);
+  const redNodes = data1.nodes
+    .filter(oldN => !data2.nodes.find(newN => newN.id === oldN.id))
+    .map(oldN => ({
+      ...oldN,
+      diffColor: 'red',
+      origin: 'm1',
+    }));
+  console.log('redNodes: ', redNodes);
+  const overlayData = {
+    nodes: [...nodesM2, ...redNodes],
+    edges: [...data2.edges, ...(data1.edges ? data1.edges.filter(e=>e.diffColor === 'red') : [])],
+    info: data2.info,
+  };
+  console.log("overlay: " + overlayData)
+  return overlayData;
+}
 
 function getEdgeId(edge) {
   return edge.data.source + edge.data.label + edge.data.target;
@@ -116,7 +142,12 @@ async function renewInfo(cy) {
       ids.length > 0 ? '&id=' + ids : ''}${
       idus.length > 0 ? '&idu=' + idus : ''}`;
 
-    return await (await fetch(call)).json();
+    const call2 = `${call}&version=${SECONDV}`
+
+    const data1 = await (await fetch(call)).json();
+    const data2 = await (await fetch(call2)).json();
+
+    return overlayGraph(data1, data2);
   }
 
   const graph = {
@@ -145,8 +176,9 @@ async function renewInfo(cy) {
 async function expandGraph(cy, nodes, onLayoutStopFn) {
   if (!nodes.length) return;
 
-  const res = await fetch(`${BACKEND}/${PROJECT}/outgoing?id=${nodes.map(n => n.data().id).join('&id=')}`);
-  const data = await res.json();
+  const d1 = await fetch(`${BACKEND}/${PROJECT}/outgoing?id=${nodes.map(n => n.data().id).join('&id=')}`).then(r => r.json());
+  const d2 = await fetch(`${BACKEND}/${PROJECT}/outgoing?id=${nodes.map(n => n.data().id).join('&id=')}&version=${SECONDV}`).then(r => r.json());
+  const data = overlayGraph(d1, d2);
 
   function finalizeExpand(cy, data) {
     const new_nodes = data.nodes
@@ -485,8 +517,9 @@ function spawnGraphOnNewPane(cy, nodes) {
 async function fetchAndSpawn(cy, nodes) {
   if (!nodes.length) return;
 
-  const res = await fetch(`${BACKEND}/${PROJECT}/outgoing?id=${nodes.map((n) => n.id).join('&id=')}`);
-  const data = await res.json();
+  const d1 = await fetch(`${BACKEND}/${PROJECT}/outgoing?id=${nodes.map(n => n.data().id).join('&id=')}`).then(r => r.json());
+  const d2 = await fetch(`${BACKEND}/${PROJECT}/outgoing?id=${nodes.map(n => n.data().id).join('&id=')}&version=${SECONDV}`).then(r => r.json());
+  const data = overlayGraph(d1, d2);
 
   const nodesIds = data.nodes
     .map((node) => node.id)
@@ -1991,6 +2024,7 @@ function setPublicVars(cy, preset) {
 }
 
 export {
+  overlayGraph,
   spawnGraph,
   markRecurringNodes,
   unmarkRecurringNodes,

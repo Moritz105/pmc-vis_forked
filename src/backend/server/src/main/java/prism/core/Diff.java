@@ -164,6 +164,7 @@ public class Diff {
             predecessors.computeIfAbsent(trgId, k -> new ArrayList<>()).add(srcId);
         }
     }
+
     public int getOrCreateId(String normalized) throws Exception{
         return stringToInt.computeIfAbsent(normalized, k -> {
             int id = nextID++;

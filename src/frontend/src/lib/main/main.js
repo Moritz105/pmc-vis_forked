@@ -1,12 +1,13 @@
 import { spawnPane, getPanes } from '../views/panes/panes.js';
 import { params } from '../views/graph/layout-options/klay.js';
-import { spawnGraph } from '../views/graph/node-link.js';
-import { PROJECT } from '../utils/controls.js';
+import { overlayGraph, spawnGraph } from '../views/graph/node-link.js';
+import { PROJECT} from '../utils/controls.js';
 import { CONSTANTS } from '../utils/names.js';
 import { socket } from '../views/imports/import-socket.js';
 import { loadFingerPrints } from '../views/attributes/fingerprinits.js';
 
 let BACKEND = import.meta.env.VITE_BACKEND_RESTFUL;
+let SECONDV = "";
 
 const info = {
   details: {},
@@ -98,40 +99,25 @@ async function start() {
   const data = await socket.emitWithAck('MC_STATUS', PROJECT);
   setInfo(data.info);
 
+  SECONDV = await fetch(`${BACKEND}/${PROJECT}/coloredDiff`).then(r => r.text())
+
   Promise.all([
-    fetch(`${BACKEND}/${PROJECT}/initial`).then(r => r.json()), fetch(`${BACKEND}/${PROJECT}/compare`).then(r => r.json()),
+    fetch(`${BACKEND}/${PROJECT}/initial`).then(r => r.json()), fetch(`${BACKEND}/${PROJECT}/initial?version=${SECONDV}`).then(r => r.json()),
     // fetch(BACKEND + PROJECT).then((res) => res.json()), // requests entire dataset
   ]).then((promises) => {
     const dataM1 = promises[0];
     const dataM2 = promises[1];
-    console.log('M1: ', dataM1);
-    console.log('M2: ', dataM2);
+    //console.log('M1: ', dataM1);
+    //console.log('M2: ', dataM2);
+    const overlayData = overlayGraph(dataM1, dataM2);
     if (dataM2.info) setInfo(dataM2.info);
-    const nodesM2 = dataM2.nodes
-      .map(n => ({
-        ...n,
-        origin: 'm2',
-      }));
-    console.log('nodesM": ', nodesM2);
-    const redNodes = dataM1.nodes
-      .filter(oldN => !dataM2.nodes.find(newN => newN.id === oldN.id))
-      .map(oldN => ({
-        ...oldN,
-        diffColor: 'red',
-        origin: 'm1',
-      }));
-    console.log('redNodes: ', redNodes);
-    const overlayData = {
-      nodes: [...nodesM2, ...redNodes],
-      edges: [...dataM2.edges, ...(dataM1.edges ? dataM1.edges.filter(e=>e.diffColor === 'red') : [])],
-      info: dataM2.info,
-    };
-    console.log('overlayData: ', overlayData);
+    //console.log('overlayData: ', overlayData);
+
     const nodesIds = overlayData.nodes
       .filter(n=>n.type === 's' || !n.id.toString().startsWith('t'))
       .map(n=>n.id);
-    overlayData.info.initial = `#${nodesIds.join(', #')}`;
-    console.log('nodesIds: ', nodesIds);
+    info.initial = `#${nodesIds.join(', #')}`;
+    //console.log('nodesIds: ', nodesIds);
     if (document.getElementById('project-id')) {
       document.getElementById('project-id').innerHTML = overlayData.info.id;
     }
@@ -145,4 +131,4 @@ async function start() {
     spawnGraph(pane, overlayData, params);
   });
 }
-export { info, setInfo, BACKEND };
+export { info, setInfo, BACKEND, SECONDV };

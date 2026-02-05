@@ -125,7 +125,6 @@ public class ModelResource extends Resource {
     ) {
         refreshProject(projectID);
         return ok(tasks.getProject(projectID).getInitialNodes(tasks.getProject(projectID).getSecondV()));
-
     }
 
     @Path("/files")
@@ -166,7 +165,6 @@ public class ModelResource extends Resource {
         refreshProject(projectID);
 
         return ok(tasks.getProject(projectID).getFingerprints());
-
     }
 
     @Path("/coloredDiff")
@@ -184,7 +182,7 @@ public class ModelResource extends Resource {
         }
         tasks.getProject(projectID).getColoring();
 
-        return ok(tasks.getProject(projectID).getGraph());
+        return ok(tasks.getProject(projectID).getSecondV());
 
     }
 

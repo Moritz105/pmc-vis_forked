@@ -114,8 +114,7 @@ public abstract class Resource {
     }
 
     protected void loadProject(File file){
-        File projectModel = new File(String.format("%s/%s/%s", rootDir, file.getName(), Namespace.PROJECT_MODEL));
-        if (file.isDirectory() && projectModel.isFile()){
+        if (file.isDirectory()){
             try {
                 String projectID = file.getName();
                 createStyleFile(projectID);
@@ -129,8 +128,7 @@ public abstract class Resource {
     public static void loadProject(TaskManager tasks, String projectID, PRISMServerConfiguration configuration) throws FileNotFoundException {
         String rootDir = configuration.getPathTemplate();
         File file = new File(String.format("%s/%s", rootDir, projectID));
-        File projectModel = new File(String.format("%s/%s", file, Namespace.PROJECT_MODEL));
-        if (file.isDirectory() && projectModel.isFile()){
+        if (file.isDirectory()){
             try {
                 createStyleFile(projectID, rootDir);
                 tasks.createProject(projectID);
