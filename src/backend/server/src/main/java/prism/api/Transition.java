@@ -22,6 +22,8 @@ public class Transition implements Node{
 
     private TreeMap<String, Double> scheduler;
 
+    private String diffColor;
+
     public Transition(){
         // Jackson deserialization
     }
@@ -30,6 +32,34 @@ public class Transition implements Node{
         this.id = id;
         this.source = source;
         this.action = action;
+        if (results != null) this.results = new TreeMap<>(results); else this.results = new TreeMap<>();
+        if (rewards != null) this.rewards = new TreeMap<>(rewards); else this.rewards = new TreeMap<>();
+        if (scheduler != null) this.scheduler = new TreeMap<>(scheduler); else this.scheduler = new TreeMap<>();
+        if (translation == null) {
+            this.probabilityDistribution = probabilityDistribution;
+        }
+        else{
+            Map<String, Double> translated = new HashMap<>();
+            Double d = 0.0;
+            for (Map.Entry<String, Double> e : probabilityDistribution.entrySet()) {
+                translated.put(translation.get(e.getKey()), e.getValue());
+                d += e.getValue();
+            }
+            this.probabilityDistribution = new HashMap<>(translated);
+            if (d>1.0){
+                for (String state : translated.keySet()){
+                    this.probabilityDistribution.replace(state, translated.get(state)/d);
+                }
+            }
+        }
+    }
+    // for coloring
+    public Transition(String id, String source, String action, Map<String, Double> probabilityDistribution, Map<String, Double> rewards, Map<String, Double> results, Map<String, Double> scheduler, Map<String, String> translation, String color){
+        this.id = id;
+        this.source = source;
+        this.action = action;
+        this.diffColor = color;
+        System.out.println("New Transition: Id=" + this.id + " color=" + this.diffColor);
         if (results != null) this.results = new TreeMap<>(results); else this.results = new TreeMap<>();
         if (rewards != null) this.rewards = new TreeMap<>(rewards); else this.rewards = new TreeMap<>();
         if (scheduler != null) this.scheduler = new TreeMap<>(scheduler); else this.scheduler = new TreeMap<>();

@@ -51,6 +51,18 @@ public class State implements Node{
         this.properties = new TreeMap<>();
         this.rewards = new TreeMap<>();
     }
+    public State(String id, String name, Map<String, Object> parameters, TreeMap<String, AP> atomicPropositions, Map<String, Double> rewards, Map<String, Double> properties, String color) {
+        this.id = id;
+        this.name = name;
+        this.parameters = new TreeMap<>(parameters);
+        this.clusteredNodes = null;
+        this.clusters = null;
+        this.properties = new TreeMap<>(properties);
+        this.rewards = new TreeMap<>(rewards);
+        this.atomicPropositions = atomicPropositions;
+        this.diffColor = color;
+        System.out.println("New State: Id=" + this.id + " name=" + this.name + " color=" + this.diffColor);
+    }
 
     @Override
     public String getId() {

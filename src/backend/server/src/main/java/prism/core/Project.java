@@ -10,6 +10,7 @@ import java.io.*;
 import java.nio.file.Files;
 import java.sql.SQLException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 
 /**
@@ -35,6 +36,9 @@ public class Project implements Namespace{
     private Map<String, Model> models;
     private String newestVersion;
     private String secondNewestVersion;
+    private Map<String, String> colorCache = new HashMap<>();
+
+    private Diff diff;
 
     public static Project reset(Project original) throws Exception {
         return new Project(original.id, original.rootDir, original.taskManager, original.database, original.cuddMaxMem, original.numIterations, original.debug);
@@ -60,6 +64,10 @@ public class Project implements Namespace{
         this.models = new HashMap<>();
 
         addAllFiles();
+
+        if (this.models.size()>1){
+            this.diff = new Diff(this, models.get(secondNewestVersion), models.get(newestVersion));
+        }
     }
 
     private void addAllFiles() throws Exception {
@@ -282,7 +290,9 @@ public class Project implements Namespace{
     }
 
     public List<Map<String, String>> getFingerprints() throws Exception{
-        Diff diff = new Diff(this, models.get(secondNewestVersion), models.get(newestVersion));
+        if (diff==null){
+            this.diff = new Diff(this, models.get(secondNewestVersion), models.get(newestVersion));
+        }
         return diff.getDistributions();
     }
 
@@ -290,10 +300,26 @@ public class Project implements Namespace{
 
     public  Map<String, Model> getModels() {return this.models;}
 
-    public Map<String, List<String>> getColoring() throws Exception{
-        Diff diff = new Diff(this, models.get(secondNewestVersion), models.get(newestVersion));
+    public Map<String, String> getColoring() throws Exception{
         return diff.matchNodes();
     }
+
+    /*public Graph applyColors(Graph graph) {
+        try {
+            if (graph == null || colorCache.isEmpty()) {
+                return graph;
+            }
+            for (prism.api.State state : graph.getStates()) {
+                String name = state.getName();
+                String color = colorCache.getOrDefault(name, colorCache.get(name.replace("(", "").replace(")", "")));
+                if (color != null) {
+                    state.setDiffColor(color);
+                }
+            }
+        }catch(Exception e){
+            System.err.println("Fehler beim Einfärben"+ e.getMessage());
+        }return  graph;
+    }*/
 
 //    public TreeMap<String, String> modelCheckAllStatistical(long maxPathLength, String simulationMethod, boolean parallel, Optional<String> schedulerName) throws Exception {
 //        TreeMap<String, String> info = new TreeMap<>();

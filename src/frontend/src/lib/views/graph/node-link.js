@@ -195,6 +195,10 @@ async function expandGraph(cy, nodes, onLayoutStopFn) {
     }
     cy.nodes().unlock();
 
+    if (window.dataM1) {
+      applyDiff(cy, window.dataM1);
+    }
+
     const layout = cy.layout(cy.params);
     layout.pon('layoutstop').then(() => {
       // kills batch expansion if there is nothing to expand
@@ -249,11 +253,11 @@ async function expandGraph(cy, nodes, onLayoutStopFn) {
 
 function setNeedsHTML(d) {
   // allows checking for 'node[needsHTML = "true"]' to not create empty divs per node
-  const aps = d.details[CONSTANTS.atomicPropositions];
-  d.needsHTML = '' + (aps && (
-    aps[CONSTANTS.ap_init]
-    || aps[CONSTANTS.ap_deadlock]
-    || aps[CONSTANTS.ap_end]
+  const aps = d.details?.[CONSTANTS.atomicPropositions];
+  d.needsHTML = '' + (!!(
+    aps?.[CONSTANTS.ap_init]
+    || aps?.[CONSTANTS.ap_deadlock]
+    || aps?.[CONSTANTS.ap_end]
   ));
   return d;
 }
@@ -317,8 +321,11 @@ const initHTML = _.debounce((cy) =>{
 // inits cy with graph data on a pane
 function spawnGraph(pane, data, params, vars = {}) {
   const elements = {
-    nodes: data.nodes.map(d => ({ data: setNeedsHTML(d) })),
-    edges: data.edges.map(d => ({ data: d })),
+    nodes: data.nodes.map(d => ({
+      data: { ...d, ...setNeedsHTML(d) },
+      classes: d.type,
+    })),
+    edges: data.edges.map(d => ({ data: { ...d } })),
   };
 
   const cytoscapeInit = {
@@ -359,6 +366,9 @@ function spawnGraph(pane, data, params, vars = {}) {
     bindListeners(cy);
     setPane(pane.id, { make: true });
     initHTML(cy);
+    if (window.dataM1) {
+      applyDiff(cy, window.dataM1);
+    }
     cy.endBatch();
 
     initControls(cy);
@@ -370,6 +380,45 @@ function spawnGraph(pane, data, params, vars = {}) {
     return cy;
   }
   return null;
+}
+function applyDiff(cy, dataM1) {
+  if (!cy || !dataM1) return;
+
+  const m1Ids = dataM1.nodes.map(n => String(n.id));
+
+  cy.batch(() => {
+    dataM1.nodes.forEach(m1Node => {
+      const currentId = String(m1Node.id());
+      if (cy.getElementById(currentId).length === 0) {
+        cy.add({
+          group: 'nodes',
+          data: {
+            ...m1Node,
+            diffColor: 'red',
+            type: m1Node.type || 's',
+          },
+          classes: m1Node.type || 's',
+        });
+      }
+    });
+
+    dataM1.edges.forEach(m1Edge => {
+      const srcExists = cy.getElementById(String(m1Edge.source)).length > 0;
+      const trgExists = cy.getElementById(String(m1Edge.target)).length > 0;
+      if (srcExists && trgExists) {
+        const edgeExists = cy.edges(`[source="${m1Edge.source}"][target="${m1.Edge.target}"]`).length > 0;
+        if (!edgeExists) {
+          cy.add({
+            group: 'edges',
+            data: {
+              ...m1Edge,
+              diffColor: 'red',
+            },
+          });
+        }
+      }
+    });
+  });
 }
 
 function haveCommonNodes(array1, obj2) {
@@ -672,9 +721,9 @@ function buildDetailsTooltipFromNode(cy, n) {
     if (!g.details[d]) return;
 
     const show = details[d].all
-      || Object.values(
-        details[d].props,
-      ).reduce((a, b) => a || b, false);
+        || Object.values(
+          details[d].props,
+        ).reduce((a, b) => a || b, false);
 
     if (show) {
       const block = document.createElement('div');
@@ -789,7 +838,7 @@ function bindListeners(cy) {
 
     if (
       (e.originalEvent.altKey || e.originalEvent.ctrlKey)
-      && n.classes().filter(c => c === 's').length > 0
+        && n.classes().filter(c => c === 's').length > 0
     ) {
       spawnGraphOnNewPane(cy, [n.data()]);
     } else if (e.originalEvent.shiftKey) {
@@ -870,9 +919,9 @@ function updateDetailsToShow(cy, { update } = {}) {
 
   let mode = CONSTANTS.results;
   const ready = details[CONSTANTS.results]
-    && Object.values(details[CONSTANTS.results])
-      .map(a => a.status === CONSTANTS.STATUS.ready)
-      .reduce((a, b) => a && b, true);
+      && Object.values(details[CONSTANTS.results])
+        .map(a => a.status === CONSTANTS.STATUS.ready)
+        .reduce((a, b) => a && b, true);
 
   if (!ready) {
     mode = CONSTANTS.variables;
@@ -897,7 +946,7 @@ function updateDetailsToShow(cy, { update } = {}) {
     Object.keys(details[d]).forEach(p => {
       const iv = truthVal || (
         d === CONSTANTS.results
-        && info.details[d][p].status === CONSTANTS.STATUS.ready
+          && info.details[d][p].status === CONSTANTS.STATUS.ready
       );
       props[d].props[p] = init ? iv : update[d].props[p];
       props[d].metadata[p] = info.details[d] ? info.details[d][p] : undefined;
@@ -1094,20 +1143,20 @@ async function exportCy(cy, selection) {
           .elements
           .nodes
           .filter(node => setSelect.has(node.data.id)
-            || !m.includes(node.data.type));
+                || !m.includes(node.data.type));
 
         setSelect = new Set(paneData.elements.nodes.map(d => d.data.id));
 
         paneData.elements.edges &&= paneData.elements.edges.filter(edge => {
           return (
             setSelect.has(edge.data.source)
-            && setSelect.has(edge.data.target)
+              && setSelect.has(edge.data.target)
           );
         });
       }
 
       const dataStr = 'data:text/json;charset=utf-8,'
-        + encodeURIComponent(JSON.stringify(paneData));
+          + encodeURIComponent(JSON.stringify(paneData));
       const dl = document.getElementById('download');
       dl.setAttribute('href', dataStr);
       dl.setAttribute('download', `graph-${cy.paneId}.json`);

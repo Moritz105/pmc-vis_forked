@@ -23,6 +23,8 @@ import prism.core.Property.Property;
 import prism.core.Utility.Prism.Updater;
 import prism.db.Batch;
 import prism.server.Task;
+import prism.api.Graph;
+import prism.db.Database;
 
 import javax.ws.rs.client.Client;
 import java.io.*;
@@ -71,16 +73,16 @@ public class whatiftest extends ConfiguredCommand<PRISMServerConfiguration> {
     
 
     @Override 
-    public void run(Bootstrap bootstrap, Namespace namespace, PRISMServerConfiguration configuration) throws Exception{
-        
-         final JdbiFactory factory = new JdbiFactory();
+    public void run(Bootstrap bootstrap, Namespace namespace, PRISMServerConfiguration configuration) throws Exception {
+
+        final JdbiFactory factory = new JdbiFactory();
         DataSourceFactory dbfactory = configuration.getDataSourceFactory();
         String projectID = "temp";
         String rootDir = configuration.getPathTemplate();
 
-        try{
+        try {
             Files.createDirectory(Paths.get(String.format("%s/%s", rootDir, projectID)));
-        }catch(FileAlreadyExistsException e){
+        } catch (FileAlreadyExistsException e) {
             System.out.println("temp was not deleted");
             removeDir(new File(String.format("%s/%s", rootDir, projectID)));
             Files.createDirectory(Paths.get(String.format("%s/%s", rootDir, projectID)));
@@ -94,13 +96,12 @@ public class whatiftest extends ConfiguredCommand<PRISMServerConfiguration> {
         dbfactory.setUrl(String.format("jdbc:sqlite:%s/%s/%s", configuration.getPathTemplate(), projectID, prism.core.Namespace.DATABASE_FILE));
 
 
-
         final Jdbi jdbi = factory.build(new Environment("temp"), dbfactory, projectID);
         Database database = new Database(jdbi, configuration.getDebug());
 
         TaskManager taskManager = new TaskManager();
 
-        Project project = new Project(projectID, configuration.getPathTemplate(), taskManager,  database, configuration.getCUDDMaxMem(), configuration.getIterations(), configuration.getDebug());
+        Project project = new Project(projectID, configuration.getPathTemplate(), taskManager, database, configuration.getCUDDMaxMem(), configuration.getIterations(), configuration.getDebug());
 
         copyFile(new File((String) namespace.get("first_model")), model_1);
 
@@ -108,49 +109,64 @@ public class whatiftest extends ConfiguredCommand<PRISMServerConfiguration> {
         project.createModel(model_1, "1");
         project.createModel(model_2, "2");
 
+        // 1. Modelle laden
         Model m1 = project.getModel("1");
         Model m2 = project.getModel("2");
 
-        Diff test = new Diff(project, m1, m2);
-        test.compareVariables();
-        System.out.println("test OK");
-        //System.out.println(project.getFingerprints());
-        //System.out.println(project.getModels());
-        //System.out.println(project.getModels().get(project.getSecondV()));
-        Map<String, List<String>> partitions = test.matchNodes();
-        System.out.println(partitions);
+        // 2. Diff-Instanz erstellen
+        Diff diff = new Diff(project, m1, m2);
+        System.out.println("--- Starte Diff-Validierung ---");
 
-        /*Map<String, List<String>> result = test.matchNodes();
-        List<String> green = result.get("green");
-        List<String> red = result.get("red");
+        // 3. Echte Daten ziehen (korrigierter Zugriff)
+        // Wir holen uns die Liste aller Zustände vom Graph
+        List<prism.api.State> statesList = m1.getModelParser().getGraph().getStates();
 
-        String sample = "t99";
-        String rNode = "R_" + sample;
-        String lNode = "L_" + sample;
+        if (statesList != null && !statesList.isEmpty()) {
+            // Wir nehmen den Namen des ersten verfügbaren Zustands
+            String realStateName = statesList.get(0).toString();
+            String normalized = m1.getModelParser().normalizeStateName(realStateName);
 
-        System.out.println("--- Partner-Verbleib-Check ---");
-        System.out.println("Ist " + rNode + " in Green? " + green.contains(rNode));
-        System.out.println("Ist " + lNode + " in Red? " + red.contains(lNode));
+            // ID-Mapping Check
+            int id = diff.getOrCreateId(normalized);
 
-// Jetzt suchen wir L_t99 in den "identischen" Listen
-        boolean foundInIdentical = false;
-        for (Map.Entry<String, List<String>> entry : result.entrySet()) {
-            if (!entry.getKey().equals("red") && !entry.getKey().equals("green")) {
-                if (entry.getValue().contains(lNode)) {
-                    System.out.println(lNode + " wurde gefunden in Block: " + entry.getKey());
-                    System.out.println("Inhalt dieses Blocks: " + entry.getValue());
-                    foundInIdentical = true;
-                }
+            // Test: Liefert der un-normalisierte Name dieselbe ID?
+            if (id == diff.getOrCreateId(realStateName)) {
+                System.out.println("SUCCESS: ID-Mapping korrekt für Zustand: " + normalized + " (ID: " + id + ")");
+            } else {
+                System.out.println("ERROR: ID-Mapping Inkonsistenz!");
             }
+        } else {
+            System.out.println("WARNUNG: Graph hat keine Zustände.");
         }
 
-        if (!foundInIdentical) {
-            System.out.println(lNode + " ist verschollen! (Weder in Red, noch in Green, noch in Identisch)");
-        }*/
+        // 4. Den Paige-Tarjan Algorithmus ausführen
+        Map<String, String> colors = diff.matchNodes();
 
+        // 5. Ergebnisse ausgeben
+        System.out.println("--- DIFF STATISTIK ---");
+
+// Da colors nun Map<ID, Farbe> ist, gruppieren wir nach den Werten (Farben)
+        Map<String, List<String>> groupedByColor = colors.entrySet().stream()
+                .collect(Collectors.groupingBy(
+                        Map.Entry::getValue,
+                        Collectors.mapping(Map.Entry::getKey, Collectors.toList())
+                ));
+
+        groupedByColor.forEach((color, states) -> {
+            // 'none' ignorieren wir meistens in der Statistik, um das Wichtige zu sehen
+            if (!"none".equalsIgnoreCase(color)) {
+                System.out.println(color.toUpperCase() + ": " + states.size() + " Elemente.");
+                System.out.println("   Beispiele: " + states.stream().limit(5).collect(Collectors.toList()));
+            }
+        });
+
+// Kurze Zusammenfassung für 'none'
+        int neutralCount = groupedByColor.getOrDefault("none", Collections.emptyList()).size();
+        System.out.println("NEUTRAL (unverändert): " + neutralCount + " Elemente.");
+
+        // 6. Aufräumen
         project.removeFiles();
     }
-
      private void copyFile(File inFile, File outFile){
         try (
                 InputStream in = new BufferedInputStream(

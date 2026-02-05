@@ -31,6 +31,8 @@ import java.util.stream.Collectors;
 
 public class Diff {
     Project project;
+    Model left;
+    Model right;
     ModelParser parserleft;
     ModelParser parserright;
     private Map<String,VariableInfo> start = new TreeMap<>();
@@ -42,23 +44,23 @@ public class Diff {
     private Map<Integer, String> intToString = new HashMap<>();
     private int nextID = 0;
     private int[] degree = new int[512];
-    private Set<Integer> initialL = new HashSet<>();
-    private Set<Integer> initialR = new HashSet<>();
+    private BitSet idsInL = new BitSet();
+    private BitSet idsInR = new BitSet();
     private Set<Integer> realCauses = new HashSet<>();
     private Map<String, prism.api.State> stringToState = new HashMap<>();
+    private List<BitSet> finalPartitions;
 
     public Diff(Project project, Model left, Model right) throws Exception{
-
+        System.out.println("starting diff");
         this.project =  project;
+        this.left = left;
+        this.right = right;
         this.parserleft = left.getModelParser();
         this.parserright = right.getModelParser();
         this.start = (Map<String,VariableInfo>) left.getInfo().getStateEntry(Namespace.OUTPUT_VARIABLES);
         this.comp = (Map<String,VariableInfo>) right.getInfo().getStateEntry(Namespace.OUTPUT_VARIABLES);
         this.possibilities = compareVariables();
         buildPredecessorMap();
-        matchNodes();
-        regStateObj(parserleft, true);
-        regStateObj(parserright, false);
         this.predecessors = predecessors;
         System.out.println(predecessors);
         //System.out.println(possibilities);
@@ -138,31 +140,36 @@ public class Diff {
         fillPredeccessor(parserright, false);
     }
     public void fillPredeccessor(ModelParser parser, boolean isLeft) throws Exception{
-
-        for (prism.api.State s : parser.getInitialNodes().getStates()){
-            int id = getCompactID(s.toString(), isLeft);
-            if (isLeft){initialL.add(id);}else{initialR.add(id);}
-        }
-
-        for (Edge e: parser.getGraph().getEdges()){
-            int target = getCompactID(e.getTarget(), isLeft);
-            int source = getCompactID(e.getSource(), isLeft);
-            degree[source]++;
-            successors.computeIfAbsent(source, k -> new ArrayList<>()).add(target);
-            predecessors.computeIfAbsent(target, k -> new ArrayList<>()).add(source);
+        System.out.println("entered filling predessessors");
+        prism.api.Graph graph = parser.getGraph();
+        System.out.println("parser.getgraph() finished");
+        for (Edge e: graph.getEdges()){
+            String srcName = parser.normalizeStateName(e.getSource());
+            String trgName = parser.normalizeStateName(e.getTarget());
+            //System.out.println("src:" +  srcName + " trg:" + trgName);
+            int srcId = getOrCreateId(srcName);
+            int trgId = getOrCreateId(trgName);
+            if (isLeft){
+                idsInL.set(srcId);
+                idsInL.set(trgId);
+            }else{
+                idsInR.set(srcId);
+                idsInR.set(trgId);
+            }
+            if (srcId >= degree.length){
+                degree = Arrays.copyOf(degree, Math.max(degree.length *2, srcId + 1));
+            }
+            degree[srcId]++;
+            successors.computeIfAbsent(srcId, k -> new ArrayList<>()).add(trgId);
+            predecessors.computeIfAbsent(trgId, k -> new ArrayList<>()).add(srcId);
         }
     }
-    public int getCompactID(String original, boolean isLeft) throws Exception{
-        String unique = (isLeft ? "L_" : "R_") + original;
-        if (!stringToInt.containsKey(unique)){
-            int currentID = nextID++;
-            stringToInt.put(unique, currentID);
-            intToString.put(currentID, unique);
-            if (currentID>=degree.length){
-                degree = Arrays.copyOf(degree, degree.length *2);
-            }
-        }
-        return  stringToInt.get(unique);
+    public int getOrCreateId(String normalized) throws Exception{
+        return stringToInt.computeIfAbsent(normalized, k -> {
+            int id = nextID++;
+            intToString.put(id, k);
+            return id;
+        });
     }
 
     public List<BitSet> createOrderByDegree(){
@@ -175,9 +182,10 @@ public class Diff {
         return new ArrayList<>(partitionMap.values());
     }
 
-    public Map<String, List<String>> matchNodes(){
+    public Map<String, String> matchNodes() throws Exception{
         List<BitSet> partitions = createOrderByDegree();
         List<BitSet> worklist = new LinkedList<>(partitions);
+        System.out.println("Start matching");
         while (!worklist.isEmpty()){
             BitSet splitter = worklist.remove(0); //take out first element
             BitSet splitterRel = calcSplitterRel(splitter); //calc its predecessors
@@ -187,6 +195,7 @@ public class Diff {
                 splitBlockIfNessesary(it, candidate, splitterRel, worklist, splitter);
             }
         }
+        this.finalPartitions = partitions;
         //now compare if theres only bitsets left with one node of each model
         return getColorDiff(partitions);
     }
@@ -238,64 +247,71 @@ public class Diff {
         }
     }
 
-    public Map<String, List<String>> getColorDiff(List<BitSet> partitions){
+    public HashMap<String, String> getColorDiff(List<BitSet> partitions) throws Exception{
         Map<String, List<String>> colorDiff = new HashMap<>();
-        colorDiff.put("red", new  ArrayList<>()); // any node not in m2
-        colorDiff.put("green", new  ArrayList<>()); //any node new in m2
-        colorDiff.put("blue", new   ArrayList<>()); // node that misses edge and causes avalanche of red/green states on parents
-        colorDiff.put("halo", new  ArrayList<>()); // nodes on trace to blue
+        List<String> red=  new  ArrayList<>(); // any node not in m2
+        List<String> green = new  ArrayList<>(); //any node new in m2
+        List<String> blue = new   ArrayList<>(); // node that misses edge and causes avalanche of red/green states on parents
+        List<String> halo = new  ArrayList<>(); // nodes on trace to blue
 
-        for (BitSet b : partitions){
-            if (isPure(b)){
-                boolean isLeft = containsModel(b, true);
-                for (int i = b.nextSetBit(0); i >= 0; i = b.nextSetBit(i+1)) {
-                    String name = intToString.get(i).substring(2);
-                    String fullName=intToString.get(i);
-                    prism.api.State state = stringToState.get(fullName);
-                    //if (state == null){continue;}
-                    String color;
-                    if (realCauses.contains(i) || successors.getOrDefault(i, new ArrayList<>()).isEmpty()){
-                        color = "blue";
-                    }else{
-                        color = isLeft ? "red" : "green";
+        for (String name : stringToInt.keySet()){
+            boolean inL = existsInModel(name, idsInL);
+            boolean inR = existsInModel(name, idsInR);
 
+            if (inL && !inR){red.add(name);}
+            else if(!inL && inR){green.add(name);}
+        }
+        boolean changed = true;
+        while (changed){
+            changed = false;
+            for (String name : stringToInt.keySet()){
+                if (existsInModel(name, idsInL) && existsInModel(name, idsInR) && !blue.contains(name) && !halo.contains(name)){
+                    Classification res = classifyDivergeence(name, red, green, blue, halo);
+                    if (res==Classification.BLUE){
+                        blue.add(name);
+                        changed = true;
+                    }else if (res == Classification.HALO){
+                        halo.add(name);
+                        changed = true;
                     }
-                    List<String> red = colorDiff.get("red");
-                    List<String> green = colorDiff.get("green");
-                    Set<String> halo = red.stream().filter(green::contains).collect(Collectors.toSet());
-                    red.removeAll(halo);
-                    green.removeAll(halo);
-                    colorDiff.get("halo").addAll(halo);
-                    colorDiff.get(color).add(name);
                 }
             }
-        }return colorDiff;
+        }
+        colorDiff.put("red", red);
+        colorDiff.put("green", green);
+        colorDiff.put("blue", blue);
+        colorDiff.put("halo", halo);
+        System.out.println("colorDiff:"+colorDiff);
+        HashMap<String, String> colorSwitch = new HashMap<>();
+        for (Map.Entry entry: colorDiff.entrySet()){
+            String hue = (String) entry.getKey();
+            List<String> nodes = (List<String>) entry.getValue();
+            for (String node : nodes){
+                colorSwitch.put(node, hue);
+            }
+        }
+        this.left.setColors(colorSwitch);
+        this.right.setColors(colorSwitch);
+        parserleft.getGraph();
+        parserright.getGraph();
+        return colorSwitch;
+    }
+
+    public boolean existsInModel(String name, BitSet modelIds){
+        Integer id = stringToInt.get(name);
+        return id != null && modelIds.get(id);
     }
 
     public boolean containsModel(BitSet block, boolean isLeft){
-        String prefix = isLeft ? "L_" : "R_";
-        for (int i = block.nextSetBit(0); i >= 0; i = block.nextSetBit(i+1)) {
-            if (intToString.get(i).startsWith(prefix)){
-                return true;
-            }
-        }return false;
+        BitSet modelIds = isLeft ? idsInL : idsInR;
+        return block.intersects(modelIds);
     }
 
     public boolean isPure(BitSet block){
-        boolean hasL = containsModel(block, true);
-        boolean hasR = containsModel(block, false);
-        return hasL != hasR;
+        boolean hasL = block.intersects(idsInL) && !block.intersects(idsInR);
+        boolean hasR = block.intersects(idsInR) && !block.intersects(idsInL);
+        return hasL || hasR;
     }
-
-    public void regStateObj(ModelParser parser, boolean isLeft) throws Exception {
-        for (prism.api.State s: parser.getGraph().getStates()){
-            String unique = (isLeft ? "L_" : "R_") + s.toString();
-            if (stringToInt.containsKey(unique)){
-                stringToState.put(unique, s);
-            }
-        }
-    }
-
 
     //functions for debugging
     public Map<String, Integer> getStringToInt(){
@@ -305,6 +321,8 @@ public class Diff {
     public Map<Integer, String> getIntToString() {
         return intToString;
     }
+
+    public Map<String, prism.api.State> getStringToState(){return stringToState;}
 
     public Integer getNextID(){
         return nextID++;
@@ -318,6 +336,28 @@ public class Diff {
             return this.predecessors.get(nodeID);
         }
         return new ArrayList<>();
+    }
+
+    private enum Classification {NONE, BLUE, HALO}
+
+    private Classification classifyDivergeence(String name, List<String> red, List<String> green, List<String> blue, List<String> halo) {
+        Integer id = stringToInt.get(name);
+        List<Integer> targets = successors.getOrDefault(id, new ArrayList<>());
+        boolean leadsToChange = false;
+        boolean leadsToHalo = false;
+
+        for (Integer targetId : targets) {
+            String targetName = intToString.get(targetId);
+            if (targetName == null){continue;}
+
+            if (red.contains(targetName)||green.contains(targetName)){
+                return Classification.BLUE;
+            }
+            if (blue.contains(targetName)||halo.contains(targetName)){
+                leadsToHalo = true;
+            }
+        }
+        return leadsToHalo ? Classification.HALO : Classification.NONE;
     }
 }
         

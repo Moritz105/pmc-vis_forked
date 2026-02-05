@@ -17,6 +17,11 @@ const colors = {
   EDGE_COLOR: '#dadada',
   HL_EDGE_COLOR: '#d6730f',
   EDGE_LABEL_COLOR: '#b3b3b3',
+
+  DIFF_HALO: '#E5C07B',
+  DIFF_RED: '#FF4136',
+  DIFF_BLUE: '#0074D9',
+  DIFF_GREEN: '#2ECC40',
 };
 
 const outlines = {
@@ -161,6 +166,38 @@ const stylesheet = [
       'line-color': colors.HL_EDGE_COLOR,
       'target-arrow-color': colors.HL_EDGE_COLOR,
       'line-style': 'solid',
+    },
+  },
+  {
+    selector: 'node[diffColor = "halo"]',
+    style: {
+      'border-color': colors.DIFF_HALO,
+      'border-width': 5,
+      'border-style': 'double', // Damit es sich vom Rest abhebt
+    },
+  },
+  {
+    selector: 'node[diffColor = "red"]',
+    style: {
+      'background-color': colors.DIFF_RED,
+      'text-outline-color': colors.DIFF_RED,
+      'border-color': colors.DIFF_RED,
+    },
+  },
+  {
+    selector: 'node[diffColor = "blue"]',
+    style: {
+      'background-color': colors.DIFF_BLUE,
+      'text-outline-color': colors.DIFF_BLUE,
+      'border-color': colors.DIFF_BLUE,
+    },
+  },
+  {
+    selector: 'node[diffColor = "green"]',
+    style: {
+      'background-color': colors.DIFF_GREEN,
+      'text-outline-color': colors.DIFF_GREEN,
+      'border-color': colors.DIFF_GREEN,
     },
   },
 ];

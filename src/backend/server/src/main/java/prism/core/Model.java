@@ -52,6 +52,7 @@ public class Model implements Namespace {
 
     public boolean debug;
 
+    private HashMap<String, String> colors = new HashMap<>();
 
     public Model(File modelFile, String version, Project parent, boolean debug) throws Exception {
 
@@ -129,6 +130,15 @@ public class Model implements Namespace {
         if (checker.isBuilt()) {
             this.setBuilt(true);
         }
+    }
+
+    public HashMap<String, String> getColors() {
+        System.out.println("colores in model:" + this.colors);
+        return this.colors;
+    }
+    public void setColors(HashMap<String, String> colors) {
+        this.colors = colors;
+        System.out.println("Colors setted" + colors);
     }
 
     //---Utility Functions---

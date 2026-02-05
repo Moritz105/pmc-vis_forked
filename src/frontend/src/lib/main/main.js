@@ -98,69 +98,51 @@ async function start() {
   const data = await socket.emitWithAck('MC_STATUS', PROJECT);
   setInfo(data.info);
 
-  // 1. Trigger analysis first (sequential start)
-  fetch(`${BACKEND}/${PROJECT}/fingerprints`)
-      .then(response => response.json())
-      .then(fingerprintData => {
+  Promise.all([
+    fetch(`${BACKEND}/${PROJECT}/initial`).then(r => r.json()), fetch(`${BACKEND}/${PROJECT}/compare`).then(r => r.json()),
+    // fetch(BACKEND + PROJECT).then((res) => res.json()), // requests entire dataset
+  ]).then((promises) => {
+    const dataM1 = promises[0];
+    const dataM2 = promises[1];
+    console.log('M1: ', dataM1);
+    console.log('M2: ', dataM2);
+    if (dataM2.info) setInfo(dataM2.info);
+    const nodesM2 = dataM2.nodes
+      .map(n => ({
+        ...n,
+        origin: 'm2',
+      }));
+    console.log('nodesM": ', nodesM2);
+    const redNodes = dataM1.nodes
+      .filter(oldN => !dataM2.nodes.find(newN => newN.id === oldN.id))
+      .map(oldN => ({
+        ...oldN,
+        diffColor: 'red',
+        origin: 'm1',
+      }));
+    console.log('redNodes: ', redNodes);
+    const overlayData = {
+      nodes: [...nodesM2, ...redNodes],
+      edges: [...dataM2.edges, ...(dataM1.edges ? dataM1.edges.filter(e=>e.diffColor === 'red') : [])],
+      info: dataM2.info,
+    };
+    console.log('overlayData: ', overlayData);
+    const nodesIds = overlayData.nodes
+      .filter(n=>n.type === 's' || !n.id.toString().startsWith('t'))
+      .map(n=>n.id);
+    overlayData.info.initial = `#${nodesIds.join(', #')}`;
+    console.log('nodesIds: ', nodesIds);
+    if (document.getElementById('project-id')) {
+      document.getElementById('project-id').innerHTML = overlayData.info.id;
+    }
 
-        // 2. Only after fingerprints are done, fetch the graphs
-        return Promise.all([
-          fetch(`${BACKEND}/${PROJECT}/initial`).then(r => r.json()),
-          fetch(`${BACKEND}/${PROJECT}/compare`).then(r => r.json()),
-          Promise.resolve(fingerprintData)
-        ]);
-      })
-      .then((results) => {
-        const data1 = results[0];
-        const data2 = results[1];
-        const myFingerprints = results[2][0];
+    const firstPaneId = 'pane-0';
+    const pane = spawnPane(
+      { id: firstPaneId },
+      nodesIds,
+    );
 
-        // --- Process Nodes ---
-        const getNodes = (d) => (Array.isArray(d) ? d : (d.nodes || []));
-        const nodes1 = getNodes(data1).map(n => ({
-          group: 'nodes',
-          data: { ...n, diffColor: n.diffColor || 'none', origin: 'm1' }
-        }));
-
-        const greenNodes = getNodes(data2)
-            .filter(n => n.diffColor === 'green')
-            .map(n => ({
-              group: 'nodes',
-              data: { ...n, origin: 'm2' }
-            }));
-
-        // --- Process Edges (with duplicate filter) ---
-        const getEdges = (d) => (Array.isArray(d) ? d : (d.edges || []));
-        const edgeMap = new Map();
-        [...getEdges(data1), ...getEdges(data2)].forEach(e => {
-          if (e && e.id) edgeMap.set(e.id, { group: 'edges', data: e });
-        });
-
-        const overlayData = {
-          nodes: [...nodes1, ...greenNodes],
-          edges: Array.from(edgeMap.values()),
-        };
-
-        // --- UI Setup ---
-        const uiNodesIds = nodes1.map(n => n.data.id).filter(id => id && !id.startsWith('t'));
-        const pane = spawnPane({ id: 'pane-0' }, uiNodesIds);
-        const cy = spawnGraph(pane, overlayData, params);
-
-        if (cy) {
-          // Styling rules for the colors from Java
-          cy.style()
-              .selector('node').style({ 'label': 'data(name)', 'background-color': '#ccc' })
-              .selector('node[diffColor="blue"]').style({ 'background-color': '#007bff', 'color': '#fff' })
-              .selector('node[diffColor="red"]').style({ 'background-color': '#dc3545', 'color': '#fff' })
-              .selector('node[diffColor="green"]').style({ 'background-color': '#28a745', 'border-style': 'dashed', 'border-width': 3 })
-              .selector('node[diffColor="halo"]').style({ 'background-color': '#fff', 'border-color': '#ffc107', 'border-width': 4 })
-              .selector('edge').style({ 'curve-style': 'bezier', 'target-arrow-shape': 'triangle', 'line-color': '#999', 'opacity': 0.6 })
-              .update();
-        }
-
-        loadFingerPrints(myFingerprints);
-      })
-      .catch(err => console.error("Loading failed:", err));
+    spawnGraph(pane, overlayData, params);
+  });
 }
-
 export { info, setInfo, BACKEND };

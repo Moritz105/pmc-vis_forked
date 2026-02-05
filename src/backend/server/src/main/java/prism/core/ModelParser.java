@@ -19,7 +19,6 @@ import simulator.TransitionList;
 import java.math.BigInteger;
 import java.math.RoundingMode;
 import java.util.*;
-
 public class ModelParser {
 
     private static final Type[] valueTypes = {TypeInt.getInstance(), TypeDouble.getInstance(), TypeBool.getInstance()};
@@ -326,7 +325,6 @@ public class ModelParser {
 
     private prism.api.State convertApiState(parser.State state) throws Exception {
         BigInteger stateidentifier = stateIdentifier(state);
-
         int numRewards = modulesFile.getNumRewardStructs();
         List<String> rewardNames = modulesFile.getRewardStructNames();
         double[] rewardValues = new double[numRewards];
@@ -343,12 +341,18 @@ public class ModelParser {
             rewards.put(rewardNames.get(i), rewardValues[i]);
         }
 
-        return new prism.api.State(stateidentifier.toString(), state.toString(), variables, parent.getLabelMap(state), rewards, new TreeMap<>());
+        //TODO: Add Color Mapping
+        HashMap<String, String> colorMap = this.parent.getColors();
+        System.out.println("map in state:" + colorMap);
+        String diffColor = (colorMap != null) ? colorMap.getOrDefault(stateidentifier.toString(), "none") : "none";
+        System.out.println("state id: "+ stateidentifier + "toString" + stateidentifier.toString());
+        System.out.println("colormap in state:"+colorMap.get(stateidentifier.toString()));
+
+        return new prism.api.State(stateidentifier.toString(), state.toString(), variables, parent.getLabelMap(state), rewards, new TreeMap<>(), diffColor);
     }
 
     private Transition convertApiTransition(parser.State out, int choice_index, Choice<Double> choice, Map<parser.State, Double> distribution) throws Exception {
         BigInteger identifier = transitionIdentifier(out, choice_index);
-
         int numRewards = modulesFile.getNumRewardStructs();
         List<String> rewardNames = modulesFile.getRewardStructNames();
         double[] rewardValues = new double[numRewards];
@@ -366,7 +370,14 @@ public class ModelParser {
             rewards.put(rewardNames.get(i), rewardValues[i]);
         }
 
-        return new Transition(identifier.toString(), stateIdentifier(out).toString(), choice.getModuleOrAction(), outDistribution, rewards, null, null, null);
+        HashMap<String, String> colorMap = this.parent.getColors();
+        System.out.println("map in ts:" + colorMap);
+        String diffId = "t" + identifier.toString();
+        System.out.println("ts id:" + diffId);
+        String diffColor = (colorMap != null) ? colorMap.getOrDefault(diffId, "none") : "none";
+
+
+        return new Transition(identifier.toString(), stateIdentifier(out).toString(), choice.getModuleOrAction(), outDistribution, rewards, null, null, null, diffColor);
     }
 
     // Output Functions
@@ -383,7 +394,7 @@ public class ModelParser {
     }
 
     public Graph getGraph() throws Exception {
-        List<parser.State> states = this.initials;
+        List<parser.State> states = new ArrayList<>(this.initials);
         List<parser.State> visited = new ArrayList<>();
 
         List<prism.api.State> outStates = new ArrayList<>();

@@ -179,7 +179,12 @@ public class ModelResource extends Resource {
     ) throws Exception{
         refreshProject(projectID);
 
-        return ok(tasks.getProject(projectID).getColoring());
+        if (!tasks.containsProject(projectID)){
+            return error(new Message(String.format("Project %s not found", projectID)));
+        }
+        tasks.getProject(projectID).getColoring();
+
+        return ok(tasks.getProject(projectID).getGraph());
 
     }
 
