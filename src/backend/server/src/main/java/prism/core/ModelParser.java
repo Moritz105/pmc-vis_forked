@@ -343,10 +343,10 @@ public class ModelParser {
 
         //TODO: Add Color Mapping
         HashMap<String, String> colorMap = this.parent.getColors();
-        System.out.println("map in state:" + colorMap);
+        //System.out.println("map in state:" + colorMap);
         String diffColor = (colorMap != null) ? colorMap.getOrDefault(stateidentifier.toString(), "none") : "none";
-        System.out.println("state id: "+ stateidentifier + "toString" + stateidentifier.toString());
-        System.out.println("colormap in state:"+colorMap.get(stateidentifier.toString()));
+        //System.out.println("state id: "+ stateidentifier + "toString" + stateidentifier.toString());
+        //System.out.println("colormap in state:"+colorMap.get(stateidentifier.toString()));
 
         return new prism.api.State(stateidentifier.toString(), state.toString(), variables, parent.getLabelMap(state), rewards, new TreeMap<>(), diffColor);
     }
@@ -371,9 +371,9 @@ public class ModelParser {
         }
 
         HashMap<String, String> colorMap = this.parent.getColors();
-        System.out.println("map in ts:" + colorMap);
+        //System.out.println("map in ts:" + colorMap);
         String diffId = "t" + identifier.toString();
-        System.out.println("ts id:" + diffId);
+        //System.out.println("ts id:" + diffId);
         String diffColor = (colorMap != null) ? colorMap.getOrDefault(diffId, "none") : "none";
 
 

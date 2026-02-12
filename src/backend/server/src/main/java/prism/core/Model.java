@@ -133,12 +133,12 @@ public class Model implements Namespace {
     }
 
     public HashMap<String, String> getColors() {
-        System.out.println("colores in model:" + this.colors);
+        //System.out.println("colores in model:" + this.colors);
         return this.colors;
     }
     public void setColors(HashMap<String, String> colors) {
         this.colors = colors;
-        System.out.println("Colors setted" + colors);
+        //System.out.println("Colors setted" + colors);
     }
 
     //---Utility Functions---

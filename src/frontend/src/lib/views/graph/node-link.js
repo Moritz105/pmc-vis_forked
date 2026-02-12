@@ -47,31 +47,52 @@ let selectedPanesData = {
   selectedPanes: [],
   paneCy: null,
 };
+function overlayGraph(data1, data2) {
+  // all nodes in new model
+  const currentNodes = data2.nodes.map(n => ({
+    ...n,
+    id: String(n.id),
+    origin: 'm2',
+  }));
 
-function overlayGraph(data1, data2){
-  console.log("Data1: " + data1)
-  console.log("Data2: " + data2)
-  const nodesM2 = data2.nodes
-    .map(n => ({
-      ...n,
-      origin: 'm2',
-    }));
-  console.log('nodesM": ', nodesM2);
-  const redNodes = data1.nodes
-    .filter(oldN => !data2.nodes.find(newN => newN.id === oldN.id))
+  // all nodes from old model, missing in new one
+  const deletedNodes = data1.nodes
+    .filter(oldN => !data2.nodes.find(newN => String(newN.id) === String(oldN.id)))
     .map(oldN => ({
       ...oldN,
-      diffColor: 'red',
+      id: String(oldN.id),
+      diffColor: oldN.diffColor || 'none',
       origin: 'm1',
     }));
-  console.log('redNodes: ', redNodes);
-  const overlayData = {
-    nodes: [...nodesM2, ...redNodes],
-    edges: [...data2.edges, ...(data1.edges ? data1.edges.filter(e=>e.diffColor === 'red') : [])],
+
+  const allNodes = [...currentNodes, ...deletedNodes];
+  const activeIds = new Set(allNodes.map(n => n.id));
+  const rawEdges = [...(data1.edges || []), ...(data2.edges || [])];
+  const finalEdges = [];
+  const seenEdges = new Set();
+  // build edges from scratch so we get all
+  rawEdges.forEach(e => {
+    const s = String(e.source);
+    const t = String(e.target);
+    const edgeKey = `${s}->${t}`;
+    if (activeIds.has(s) && activeIds.has(t) && !seenEdges.has(edgeKey)) {
+      finalEdges.push({
+        ...e,
+        source: s,
+        target: t,
+        diffColor: e.diffColor || 'none',
+      });
+      seenEdges.add(edgeKey);
+    }
+    console.log(seenEdges);
+    console.log(finalEdges);
+  });
+
+  return {
+    nodes: allNodes,
+    edges: finalEdges,
     info: data2.info,
   };
-  console.log("overlay: " + overlayData)
-  return overlayData;
 }
 
 function getEdgeId(edge) {
@@ -142,7 +163,7 @@ async function renewInfo(cy) {
       ids.length > 0 ? '&id=' + ids : ''}${
       idus.length > 0 ? '&idu=' + idus : ''}`;
 
-    const call2 = `${call}&version=${SECONDV}`
+    const call2 = `${call}&version=${SECONDV}`;
 
     const data1 = await (await fetch(call)).json();
     const data2 = await (await fetch(call2)).json();

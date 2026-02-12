@@ -57,6 +57,7 @@ public class Diff {
         this.right = right;
         this.parserleft = left.getModelParser();
         this.parserright = right.getModelParser();
+        sanityCheck();
         this.start = (Map<String,VariableInfo>) left.getInfo().getStateEntry(Namespace.OUTPUT_VARIABLES);
         this.comp = (Map<String,VariableInfo>) right.getInfo().getStateEntry(Namespace.OUTPUT_VARIABLES);
         this.possibilities = compareVariables();
@@ -143,9 +144,14 @@ public class Diff {
         System.out.println("entered filling predessessors");
         prism.api.Graph graph = parser.getGraph();
         System.out.println("parser.getgraph() finished");
+
         for (Edge e: graph.getEdges()){
             String srcName = parser.normalizeStateName(e.getSource());
             String trgName = parser.normalizeStateName(e.getTarget());
+            if (!isLeft && (srcName.equals("t5") || trgName.equals("t5"))) {
+                System.out.println("ALARM: t5 im RECHTEN Modell gefunden!");
+                System.out.println("Kante: " + srcName + " -> " + trgName);
+            }
             //System.out.println("src:" +  srcName + " trg:" + trgName);
             int srcId = getOrCreateId(srcName);
             int trgId = getOrCreateId(trgName);
@@ -162,6 +168,18 @@ public class Diff {
             degree[srcId]++;
             successors.computeIfAbsent(srcId, k -> new ArrayList<>()).add(trgId);
             predecessors.computeIfAbsent(trgId, k -> new ArrayList<>()).add(srcId);
+        }
+        // Ersetze "b" durch den exakten Namen, den die Transition im Prism-File hat
+        String targetName = "t5";
+        Integer targetId = stringToInt.get(targetName);
+
+        if (targetId != null) {
+            System.out.println("--- DEBUG FÜR TRANSITION " + targetName + " ---");
+            System.out.println("Vergebene ID: " + targetId);
+            System.out.println("In Modell Links (idsInL): " + idsInL.get(targetId));
+            System.out.println("In Modell Rechts (idsInR): " + idsInR.get(targetId));
+        } else {
+            System.out.println("DEBUG: Transition " + targetName + " wurde gar nicht erst in stringToInt gefunden!");
         }
     }
 
@@ -248,70 +266,160 @@ public class Diff {
         }
     }
 
-    public HashMap<String, String> getColorDiff(List<BitSet> partitions) throws Exception{
-        Map<String, List<String>> colorDiff = new HashMap<>();
-        List<String> red=  new  ArrayList<>(); // any node not in m2
-        List<String> green = new  ArrayList<>(); //any node new in m2
-        List<String> blue = new   ArrayList<>(); // node that misses edge and causes avalanche of red/green states on parents
-        List<String> halo = new  ArrayList<>(); // nodes on trace to blue
+    public HashMap<String, String> getColorDiff(List<BitSet> partitions) throws Exception {
+        int[] stateToBlock = new int[512];
+        for (int b = 0; b < partitions.size(); b++) {
+            BitSet block = partitions.get(b);
+            for (int s = block.nextSetBit(0); s >= 0; s = block.nextSetBit(s + 1)) {
+                stateToBlock[s] = b;
+            }
+        }
 
-        for (String name : stringToInt.keySet()){
-            boolean inL = existsInModel(name, idsInL);
-            boolean inR = existsInModel(name, idsInR);
 
-            if (inL && !inR){red.add(name);}
-            else if(!inL && inR){green.add(name);}
+        HashMap<String, String> colorSwitch = new HashMap<>();
+        BitSet red = new BitSet(); // any node not in m2
+        BitSet green = new BitSet(); //any node new in m2
+        BitSet violet = new BitSet(); // node that misses edge and causes avalanche of red/green states on parents
+        BitSet halo = new BitSet(); // nodes on trace to violet
+
+        for (int b = 0; b < partitions.size(); b++) {
+            boolean inL = partitions.get(b).intersects(idsInL);
+            boolean inR = partitions.get(b).intersects(idsInR);
+            if (inL && !inR) {
+                red.set(b);
+            }
+            if (!inL && inR) {
+                green.set(b);
+            }
         }
         boolean changed = true;
-        while (changed){
+        while (changed) {
             changed = false;
-            for (String name : stringToInt.keySet()){
-                if (existsInModel(name, idsInL) && existsInModel(name, idsInR) && !blue.contains(name) && !halo.contains(name)){
-                    Classification res = classifyDivergeence(name, red, green, blue, halo);
-                    if (res==Classification.BLUE){
-                        blue.add(name);
+            for (int idR = idsInR.nextSetBit(0); idR >= 0; idR = idsInR.nextSetBit(idR + 1)) {
+                if (violet.get(idR) || halo.get(idR)) continue;
+                int currentBlock = stateToBlock[idR];
+                int idL = findPartnerInBlock(currentBlock, idsInL);
+                if (idL != -1) {
+                    if (isViolet(idR, idL, stateToBlock, green, red)) {
+                        violet.set(idR);
                         changed = true;
-                    }else if (res == Classification.HALO){
-                        halo.add(name);
+                    }
+                    else if (leadsToUnstable(idR, violet, halo)) {
+                        halo.set(idR);
                         changed = true;
                     }
                 }
             }
         }
-        colorDiff.put("red", red);
-        colorDiff.put("green", green);
-        colorDiff.put("blue", blue);
-        colorDiff.put("halo", halo);
-        System.out.println("colorDiff:"+colorDiff);
-        HashMap<String, String> colorSwitch = new HashMap<>();
-        for (Map.Entry entry: colorDiff.entrySet()){
-            String hue = (String) entry.getKey();
-            List<String> nodes = (List<String>) entry.getValue();
-            for (String node : nodes){
-                colorSwitch.put(node, hue);
-            }
-        }
+        transferToColorMap(colorSwitch, green, partitions, "green");
+        transferToColorMapForRed(colorSwitch, red, partitions, "red");
+        transferToIdSet(colorSwitch, violet, "violet");
+        transferToIdSet(colorSwitch, halo, "halo");
         this.left.setColors(colorSwitch);
         this.right.setColors(colorSwitch);
         parserleft.getGraph();
         parserright.getGraph();
+        System.out.println("TEST FÜR COLORSWITCH" + colorSwitch);
         return colorSwitch;
     }
 
-    public boolean existsInModel(String name, BitSet modelIds){
-        Integer id = stringToInt.get(name);
-        return id != null && modelIds.get(id);
+    private boolean isViolet(int idR, int idL, int[] stateToBlock, BitSet greenBlocks, BitSet redBlocks) {
+
+        Map<Integer, Integer> countsL = getBlockDistribution(idL, stateToBlock);
+        Map<Integer, Integer> countsR = getBlockDistribution(idR, stateToBlock);
+
+        if (!countsL.equals(countsR)) {
+            return true;
+        }
+
+        for (int blockIdx : countsR.keySet()) {
+            if (greenBlocks.get(blockIdx)) return true;
+        }
+        for (int blockIdx : countsL.keySet()) {
+            if (redBlocks.get(blockIdx)) return true;
+        }
+
+        return false;
     }
 
-    public boolean containsModel(BitSet block, boolean isLeft){
-        BitSet modelIds = isLeft ? idsInL : idsInR;
-        return block.intersects(modelIds);
+    private Map<Integer, Integer> getBlockDistribution(int stateId, int[] stateToBlock) {
+        Map<Integer, Integer> dist = new HashMap<>();
+        List<Integer> targets = this.successors.getOrDefault(stateId, new ArrayList<>());
+
+        for (Integer tId : targets) {
+            int bIdx = stateToBlock[tId];
+            dist.put(bIdx, dist.getOrDefault(bIdx, 0) + 1);
+        }
+        return dist;
+    }
+
+    private void transferToColorMapForRed(Map<String, String> map, BitSet redBlocks, List<BitSet> partitions, String color) {
+        for (int b = redBlocks.nextSetBit(0); b >= 0; b = redBlocks.nextSetBit(b + 1)) {
+            BitSet statesInBlock = partitions.get(b);
+            for (int s = statesInBlock.nextSetBit(0); s >= 0; s = statesInBlock.nextSetBit(s + 1)) {
+                if (idsInL.get(s)) {
+                    String name = intToString.get(s);
+                    if (name != null && !nameExistsInR(name)) {
+                        map.put(name, color);
+                    }
+                }
+            }
+        }
+    }
+
+    private boolean nameExistsInR(String name) {
+        Integer id = stringToInt.get(name);
+        return id != null && idsInR.get(id);
+    }
+
+    private void transferToColorMap(Map<String, String> map, BitSet targetBlocks, List<BitSet> partitions, String color) {
+        for (int b = targetBlocks.nextSetBit(0); b >= 0; b = targetBlocks.nextSetBit(b + 1)) {
+            BitSet statesInBlock = partitions.get(b);
+            for (int s = statesInBlock.nextSetBit(0); s >= 0; s = statesInBlock.nextSetBit(s + 1)) {
+                if (idsInR.get(s)) {
+                    String name = intToString.get(s);
+                    if (name != null) map.put(name, color);
+                }
+            }
+        }
+    }
+
+    private void transferToIdSet(Map<String, String> map, BitSet stateIds, String color) {
+        for (int s = stateIds.nextSetBit(0); s >= 0; s = stateIds.nextSetBit(s + 1)) {
+            String name = intToString.get(s);
+            if (name != null) {
+                map.put(name, color);
+            }
+        }
+    }
+
+    private int findPartnerInBlock(int blockIdx, BitSet idsInModel) {
+        BitSet block = finalPartitions.get(blockIdx);
+        BitSet partners = (BitSet) block.clone();
+        partners.and(idsInModel);
+        return partners.nextSetBit(0);
+    }
+
+    private boolean leadsToUnstable(int idR, BitSet violet, BitSet halo) {
+        List<Integer> targets = this.successors.getOrDefault(idR, new ArrayList<>());
+
+        for (Integer tId : targets) {
+            if (violet.get(tId) || halo.get(tId)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public boolean isPure(BitSet block){
         boolean hasL = block.intersects(idsInL) && !block.intersects(idsInR);
         boolean hasR = block.intersects(idsInR) && !block.intersects(idsInL);
         return hasL || hasR;
+    }
+
+    public boolean containsModel(BitSet block, boolean isLeft){
+        BitSet modelIds = isLeft ? idsInL : idsInR;
+        return block.intersects(modelIds);
     }
 
     //functions for debugging
@@ -338,27 +446,26 @@ public class Diff {
         }
         return new ArrayList<>();
     }
+    private void sanityCheck() throws Exception {
+        int edgesLeft = parserleft.getGraph().getEdges().size();
+        int edgesRight = parserright.getGraph().getEdges().size();
 
-    private enum Classification {NONE, BLUE, HALO}
+        System.out.println("--- SANITY CHECK ---");
+        System.out.println("Edges links (alt): " + edgesLeft);
+        System.out.println("Edges rechts (neu): " + edgesRight);
 
-    private Classification classifyDivergeence(String name, List<String> red, List<String> green, List<String> blue, List<String> halo) {
-        Integer id = stringToInt.get(name);
-        List<Integer> targets = successors.getOrDefault(id, new ArrayList<>());
-        boolean leadsToChange = false;
-        boolean leadsToHalo = false;
-
-        for (Integer targetId : targets) {
-            String targetName = intToString.get(targetId);
-            if (targetName == null){continue;}
-
-            if (red.contains(targetName)||green.contains(targetName)){
-                return Classification.BLUE;
-            }
-            if (blue.contains(targetName)||halo.contains(targetName)){
-                leadsToHalo = true;
-            }
+        if (edgesRight >= edgesLeft && edgesLeft > 0) {
+            System.out.println("WARNUNG: Das neue Modell hat mehr oder gleich viele Kanten wie das alte!");
         }
-        return leadsToHalo ? Classification.HALO : Classification.NONE;
+
+        // Check, ob t5 im Quelltext der Modelle vorkommt
+        String leftSource = parserleft.getModulesFile().toString();
+        String rightSource = parserright.getModulesFile().toString();
+
+        System.out.println("t5 in Source Links: " + leftSource.contains("t5"));
+        System.out.println("t5 in Source Rechts: " + rightSource.contains("t5"));
+        System.out.println("---------------------");
     }
+
 }
         
