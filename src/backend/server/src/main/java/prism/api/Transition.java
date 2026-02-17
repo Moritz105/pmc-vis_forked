@@ -59,7 +59,7 @@ public class Transition implements Node{
         this.source = source;
         this.action = action;
         this.diffColor = color;
-        System.out.println("New Transition: Id=" + this.id + " color=" + this.diffColor);
+        //System.out.println("New Transition: Id=" + this.id + " color=" + this.diffColor);
         if (results != null) this.results = new TreeMap<>(results); else this.results = new TreeMap<>();
         if (rewards != null) this.rewards = new TreeMap<>(rewards); else this.rewards = new TreeMap<>();
         if (scheduler != null) this.scheduler = new TreeMap<>(scheduler); else this.scheduler = new TreeMap<>();

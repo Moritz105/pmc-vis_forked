@@ -286,6 +286,9 @@ public class Diff {
         for (int b = 0; b < partitions.size(); b++) {
             BitSet block = partitions.get(b);
             for (int s = block.nextSetBit(0); s >= 0; s = block.nextSetBit(s + 1)) {
+                if (s >= stateToBlock.length){
+                    stateToBlock = Arrays.copyOf(stateToBlock, Math.max(stateToBlock.length *2, s + 1));
+                }
                 stateToBlock[s] = b;
             }
         }

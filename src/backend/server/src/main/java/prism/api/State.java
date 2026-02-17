@@ -61,7 +61,7 @@ public class State implements Node{
         this.rewards = new TreeMap<>(rewards);
         this.atomicPropositions = atomicPropositions;
         this.diffColor = color;
-        System.out.println("New State: Id=" + this.id + " name=" + this.name + " color=" + this.diffColor);
+        //System.out.println("New State: Id=" + this.id + " name=" + this.name + " color=" + this.diffColor);
     }
 
     @Override
