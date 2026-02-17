@@ -103,6 +103,7 @@ async function start() {
 
   Promise.all([
     fetch(`${BACKEND}/${PROJECT}/initial`).then(r => r.json()), fetch(`${BACKEND}/${PROJECT}/initial?version=${SECONDV}`).then(r => r.json()),
+    fetch(`${BACKEND}/${PROJECT}/fingerprints`).then(r => r.json())
     // fetch(BACKEND + PROJECT).then((res) => res.json()), // requests entire dataset
   ]).then((promises) => {
     const dataM1 = promises[0];
@@ -129,6 +130,8 @@ async function start() {
     );
 
     spawnGraph(pane, overlayData, params);
+    const fingerprintsTable=promises[2];
+    loadFingerPrints(fingerprintsTable);
   });
 }
 export { info, setInfo, BACKEND, SECONDV };

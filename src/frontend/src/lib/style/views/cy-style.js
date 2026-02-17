@@ -20,7 +20,7 @@ const colors = {
 
   DIFF_HALO: '#E5C07B',
   DIFF_RED: '#FF4136',
-  DIFF_BLUE: '#0074D9',
+  DIFF_VIOLET: '#9400D3',
   DIFF_GREEN: '#2ECC40',
 };
 
@@ -173,7 +173,7 @@ const stylesheet = [
     style: {
       'border-color': colors.DIFF_HALO,
       'border-width': 5,
-      'border-style': 'double', // Damit es sich vom Rest abhebt
+      'border-style': 'double',
     },
   },
   {
@@ -185,11 +185,11 @@ const stylesheet = [
     },
   },
   {
-    selector: 'node[diffColor = "blue"]',
+    selector: 'node[diffColor = "violet"]',
     style: {
-      'background-color': colors.DIFF_BLUE,
-      'text-outline-color': colors.DIFF_BLUE,
-      'border-color': colors.DIFF_BLUE,
+      'background-color': colors.DIFF_VIOLET,
+      'text-outline-color': colors.DIFF_VIOLET,
+      'border-color': colors.DIFF_VIOLET,
     },
   },
   {

@@ -49,6 +49,7 @@ public class Diff {
     private Set<Integer> realCauses = new HashSet<>();
     private Map<String, prism.api.State> stringToState = new HashMap<>();
     private List<BitSet> finalPartitions;
+    private BitSet splitterRel = new BitSet();
 
     public Diff(Project project, Model left, Model right) throws Exception{
         System.out.println("starting diff");
@@ -135,6 +136,20 @@ public class Diff {
     public int getNodesRight() throws Exception{
         return parserright.getGraph().getStates().size();
     }
+
+
+    public Map<String, Object> getExtendedFingerprints() throws Exception {
+        Map<String, Object> response = new HashMap<>();
+
+
+        response.put("numStatesRef", getNodesLeft());
+        response.put("numStatesNew", getNodesRight());
+        response.put("numTransitionsRef", getTransitionsLeft());
+        response.put("numTransitionsNew", getTransitionsRight());
+        response.put("variableComparison", getDistributions());
+
+        return response;
+    }
     //Zum Vergleich berechnen wir die Vorgänger
     public void buildPredecessorMap() throws Exception{
         fillPredeccessor(parserleft, true);
@@ -169,7 +184,7 @@ public class Diff {
             successors.computeIfAbsent(srcId, k -> new ArrayList<>()).add(trgId);
             predecessors.computeIfAbsent(trgId, k -> new ArrayList<>()).add(srcId);
         }
-        // Ersetze "b" durch den exakten Namen, den die Transition im Prism-File hat
+        // only for debuggiing
         String targetName = "t5";
         Integer targetId = stringToInt.get(targetName);
 
@@ -206,12 +221,13 @@ public class Diff {
         List<BitSet> worklist = new LinkedList<>(partitions);
         System.out.println("Start matching");
         while (!worklist.isEmpty()){
+            this.splitterRel.clear();
             BitSet splitter = worklist.remove(0); //take out first element
-            BitSet splitterRel = calcSplitterRel(splitter); //calc its predecessors
+            calcSplitterRel(splitter); //calc its predecessors
             ListIterator<BitSet> it = partitions.listIterator();
             while (it.hasNext()) {
                 BitSet candidate = it.next();
-                splitBlockIfNessesary(it, candidate, splitterRel, worklist, splitter);
+                splitBlockIfNessesary(it, candidate,  worklist, splitter);
             }
         }
         this.finalPartitions = partitions;
@@ -219,25 +235,24 @@ public class Diff {
         return getColorDiff(partitions);
     }
 
-    public BitSet calcSplitterRel(BitSet splitter){
-        BitSet splitterRel = new BitSet();
+    public void calcSplitterRel(BitSet splitter){
         for (int i = splitter.nextSetBit(0); i >= 0; i = splitter.nextSetBit(i+1)) {
             if (predecessors.get(i)!= null){
                 for (int pred : predecessors.get(i)) {
-                    splitterRel.set(pred);
+                    this.splitterRel.set(pred);
                 }
             }
-        }return splitterRel;
+        }
     }
-    public void splitBlockIfNessesary(ListIterator<BitSet> it, BitSet candidate, BitSet splitterRel, List<BitSet> worklist, BitSet splitter){
+    public void splitBlockIfNessesary(ListIterator<BitSet> it, BitSet candidate,  List<BitSet> worklist, BitSet splitter){
         BitSet refined = (BitSet) candidate.clone();
-        refined.and(splitterRel); //filter all nodes with a successor in the splitter
+        refined.and(this.splitterRel); //filter all nodes with a successor in the splitter
 
         if (!refined.isEmpty() && refined.cardinality()<candidate.cardinality()){
             boolean splitterIsMixed = containsModel(splitter, true) && containsModel(splitter, false);
             // if true, there are nodes that have a successore in the splitter and some that don't
             // thats why they can't be compared and need to be splitted
-            candidate.andNot(splitterRel); //nodes that can't reach the splitter
+            candidate.andNot(this.splitterRel); //nodes that can't reach the splitter
             if (splitterIsMixed){
                 if (isPure(candidate) || isPure(refined)){
                     for (int i = refined.nextSetBit(0); i >= 0; i = refined.nextSetBit(i+1)) {

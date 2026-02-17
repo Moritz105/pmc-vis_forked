@@ -289,11 +289,11 @@ public class Project implements Namespace{
         return propertyFiles;
     }
 
-    public List<Map<String, String>> getFingerprints() throws Exception{
+    public Map<String, Object> getFingerprints() throws Exception{
         if (diff==null){
             this.diff = new Diff(this, models.get(secondNewestVersion), models.get(newestVersion));
         }
-        return diff.getDistributions();
+        return diff.getExtendedFingerprints();
     }
 
     public String getSecondV (){return this.secondNewestVersion;}

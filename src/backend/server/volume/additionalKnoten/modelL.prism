@@ -1,0 +1,13 @@
+// model_r.prism
+mdp
+
+module M1
+    s : [0..3] init 0;
+
+    [go] s=0 -> (s'=1);
+    [a]  s=1 -> (s'=2);
+    [b]  s=1 -> (s'=2); // Pfad zu s3 wurde gelöscht!
+
+    [loop] s=2 -> (s'=2);
+    [loop] s=3 -> (s'=3);
+endmodule
