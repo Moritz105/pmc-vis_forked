@@ -40,6 +40,7 @@ public class Diff {
     private List<Map<String, String>> possibilities = new ArrayList<>();
     private Map<Integer, List<Integer>> predecessors = new HashMap<>();
     private Map<Integer, List<Integer>> successors = new HashMap<>();
+    private Set<BitSet> worklistSet = new HashSet<>();
     private Map<String, Integer> stringToInt = new HashMap<>();
     private Map<Integer, String> intToString = new HashMap<>();
     private int nextID = 0;
@@ -58,13 +59,16 @@ public class Diff {
         this.right = right;
         this.parserleft = left.getModelParser();
         this.parserright = right.getModelParser();
-        sanityCheck();
+        //sanityCheck();
         this.start = (Map<String,VariableInfo>) left.getInfo().getStateEntry(Namespace.OUTPUT_VARIABLES);
         this.comp = (Map<String,VariableInfo>) right.getInfo().getStateEntry(Namespace.OUTPUT_VARIABLES);
         this.possibilities = compareVariables();
+        long start = System.currentTimeMillis();
         buildPredecessorMap();
+        long end = System.currentTimeMillis();
+        System.out.println("TIME [predessesors]: " + (end - start) + " ms");
         this.predecessors = predecessors;
-        System.out.println(predecessors);
+        System.out.println("predecessors clculated");
         //System.out.println(possibilities);
 
     }
@@ -88,26 +92,36 @@ public class Diff {
         return calcDistribution(mapping, new ArrayList<>(mapping.keySet()), 0, new HashMap<>(), new HashSet<>(), new ArrayList<>());
     }
 
-    public List<Map<String, String>> calcDistribution( Map<String, List<String>> mapping, List<String> elements, int index, Map<String, String> current, Set<String> visited, List<Map<String, String>> distributions){
-        elements.sort(Comparator.comparingInt(v -> mapping.get(v).size()));
+    public List<Map<String, String>> calcDistribution(Map<String, List<String>> mapping, List<String> elements, int index, Map<String, String> current, Set<String> visited, List<Map<String, String>> distributions) {
 
-        //terminante and add config if all var have been visited
-        if (index == elements.size()){
+        if (!distributions.isEmpty()) {
+            return distributions;
+        }
+
+        if (index == elements.size()) {
             distributions.add(new HashMap<>(current));
             return distributions;
         }
+
         String var = elements.get(index);
 
-        for (String check : mapping.get(var)){
+        for (String check : mapping.get(var)) {
             if (visited.contains(check)) continue;
+
             current.put(var, check);
             visited.add(check);
 
-            calcDistribution(mapping, elements, index+1, current, visited, distributions);
+            calcDistribution(mapping, elements, index + 1, current, visited, distributions);
+
+            if (!distributions.isEmpty()) {
+                return distributions;
+            }
 
             current.remove(var);
             visited.remove(check);
-        }return distributions;
+        }
+
+        return distributions;
     }
 
     public List<Map<String, String>> getDistributions(){
@@ -217,12 +231,18 @@ public class Diff {
     }
 
     public Map<String, String> matchNodes() throws Exception{
+        long start = System.currentTimeMillis();
         List<BitSet> partitions = createOrderByDegree();
         List<BitSet> worklist = new LinkedList<>(partitions);
+
+        worklistSet.clear();
+        worklistSet.addAll(partitions);
+
         System.out.println("Start matching");
         while (!worklist.isEmpty()){
             this.splitterRel.clear();
             BitSet splitter = worklist.remove(0); //take out first element
+            worklistSet.remove(splitter);
             calcSplitterRel(splitter); //calc its predecessors
             ListIterator<BitSet> it = partitions.listIterator();
             while (it.hasNext()) {
@@ -232,6 +252,8 @@ public class Diff {
         }
         this.finalPartitions = partitions;
         //now compare if theres only bitsets left with one node of each model
+        long end = System.currentTimeMillis();
+        System.out.println("TIME [matching]: " + (end - start) + " ms");
         return getColorDiff(partitions);
     }
 
@@ -245,10 +267,14 @@ public class Diff {
         }
     }
     public void splitBlockIfNessesary(ListIterator<BitSet> it, BitSet candidate,  List<BitSet> worklist, BitSet splitter){
+        if (!candidate.intersects(this.splitterRel)) {
+            return;
+        }
+
         BitSet refined = (BitSet) candidate.clone();
         refined.and(this.splitterRel); //filter all nodes with a successor in the splitter
 
-        if (!refined.isEmpty() && refined.cardinality()<candidate.cardinality()){
+        if ( refined.cardinality()<candidate.cardinality()){
             boolean splitterIsMixed = containsModel(splitter, true) && containsModel(splitter, false);
             // if true, there are nodes that have a successore in the splitter and some that don't
             // thats why they can't be compared and need to be splitted
@@ -266,22 +292,26 @@ public class Diff {
     }
 
     public void updateWorklist(List<BitSet> worklist, BitSet missingSplitter , BitSet havingSplitter) {
-        if (worklist.contains(missingSplitter)){
+        if (worklistSet.contains(missingSplitter)){
             //block hasn't been used as splitter, but now we know ist actually 2 blocks so we need to add both
             //missingSplit block is already modified due to condidate.andNot, so no adding needed
             worklist.add(havingSplitter);
+            worklistSet.add(havingSplitter);
         }else{ //block was already succesfully used as splitter.
             // so we now need to add the smaller part (bc its faster) back to the worklist
             // that works bc of paige tarjan alg
             if (havingSplitter.cardinality() <= missingSplitter.cardinality()){
                 worklist.add(havingSplitter);
+                worklistSet.add(havingSplitter);
             }else{
                 worklist.add(missingSplitter);
+                worklistSet.add(missingSplitter);
             }
         }
     }
 
     public HashMap<String, String> getColorDiff(List<BitSet> partitions) throws Exception {
+        long start = System.currentTimeMillis();
         int[] stateToBlock = new int[512];
         for (int b = 0; b < partitions.size(); b++) {
             BitSet block = partitions.get(b);
@@ -333,11 +363,14 @@ public class Diff {
         transferToColorMapForRed(colorSwitch, red, partitions, "red");
         transferToIdSet(colorSwitch, violet, "violet");
         transferToIdSet(colorSwitch, halo, "halo");
+        long end = System.currentTimeMillis();
+        System.out.println("TIME [colorwitch]: " + (end - start) + " ms");
         this.left.setColors(colorSwitch);
         this.right.setColors(colorSwitch);
         parserleft.getGraph();
         parserright.getGraph();
-        System.out.println("TEST FÜR COLORSWITCH" + colorSwitch);
+        System.out.println("Erledigt: COLORSWITCH");
+
         return colorSwitch;
     }
 

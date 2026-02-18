@@ -1,0 +1,8 @@
+mdp
+const int N = 5000;
+module chain
+    s : [0..N] init 0;
+    [step] s < N -> 0.8 : (s'=s+1) + 0.2 : (s'=max(0, s-1));
+    [stay] s < N -> (s'=s);
+    [] s = N -> (s'=N);
+endmodule
