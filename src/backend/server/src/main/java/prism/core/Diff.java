@@ -168,6 +168,7 @@ public class Diff {
     public void buildPredecessorMap() throws Exception{
         fillPredeccessor(parserleft, true);
         fillPredeccessor(parserright, false);
+        System.out.println("---NAMES---"+intToString);
     }
     public void fillPredeccessor(ModelParser parser, boolean isLeft) throws Exception{
         System.out.println("entered filling predessessors");
@@ -198,6 +199,7 @@ public class Diff {
             successors.computeIfAbsent(srcId, k -> new ArrayList<>()).add(trgId);
             predecessors.computeIfAbsent(trgId, k -> new ArrayList<>()).add(srcId);
         }
+        System.out.println("---DEGREELIST---"+Arrays.toString(degree));
         // only for debuggiing
         String targetName = "t5";
         Integer targetId = stringToInt.get(targetName);
@@ -227,12 +229,14 @@ public class Diff {
             BitSet group = partitionMap.computeIfAbsent(oDegree,k -> new BitSet());
             group.set(i);
         }
+        System.out.println("---DEGREE--"+partitionMap);
         return new ArrayList<>(partitionMap.values());
     }
 
     public Map<String, String> matchNodes() throws Exception{
         long start = System.currentTimeMillis();
         List<BitSet> partitions = createOrderByDegree();
+        System.out.println("---ORIGINAL P---" + partitions);
         List<BitSet> worklist = new LinkedList<>(partitions);
 
         worklistSet.clear();
@@ -251,6 +255,7 @@ public class Diff {
             }
         }
         this.finalPartitions = partitions;
+        System.out.println(partitions);
         //now compare if theres only bitsets left with one node of each model
         long end = System.currentTimeMillis();
         System.out.println("TIME [matching]: " + (end - start) + " ms");
@@ -333,6 +338,8 @@ public class Diff {
         for (int b = 0; b < partitions.size(); b++) {
             boolean inL = partitions.get(b).intersects(idsInL);
             boolean inR = partitions.get(b).intersects(idsInR);
+            System.out.println("---IDSL---"+idsInL);
+            System.out.println("---IDSR---"+idsInR);
             if (inL && !inR) {
                 red.set(b);
             }
@@ -340,6 +347,8 @@ public class Diff {
                 green.set(b);
             }
         }
+        System.out.println("---G---"+green);
+        System.out.println("---R---"+red);
         boolean changed = true;
         while (changed) {
             changed = false;
@@ -360,7 +369,9 @@ public class Diff {
             }
         }
         transferToColorMap(colorSwitch, green, partitions, "green");
+        System.out.println("---GREEN---"+colorSwitch);
         transferToColorMapForRed(colorSwitch, red, partitions, "red");
+        System.out.println("---RED--"+colorSwitch);
         transferToIdSet(colorSwitch, violet, "violet");
         transferToIdSet(colorSwitch, halo, "halo");
         long end = System.currentTimeMillis();
@@ -369,7 +380,7 @@ public class Diff {
         this.right.setColors(colorSwitch);
         parserleft.getGraph();
         parserright.getGraph();
-        System.out.println("Erledigt: COLORSWITCH");
+        System.out.println("Erledigt: COLORSWITCH"+colorSwitch);
 
         return colorSwitch;
     }

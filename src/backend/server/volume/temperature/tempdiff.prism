@@ -1,0 +1,7 @@
+mdp
+
+module temperatur
+    t : [-1..9] init 2;
+    [waermer] t<9 -> 0.8 : (t'=t+1) + 0.2 : (t'=t);
+    [kaelter] t>-1 -> 1.0 : (t'=t-1);
+endmodule

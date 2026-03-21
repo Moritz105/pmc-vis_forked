@@ -1,0 +1,25 @@
+mdp
+
+module temperatur
+    t : [-1..10] init 2;
+    [waermer] t<10 -> 0.8 : (t'=t+1) + 0.2 : (t'=t);
+    [kaelter] t>-1 -> 1.0 : (t'=t-1);
+endmodule
+
+module schloss
+    s : [0..1] init 1;
+    [entriegeln] s=1 -> 1.0 : (s'=0);
+    [verriegeln] s=0 -> 1.0 : (s'=1);
+endmodule
+
+module feuer
+    f : [0..1] init 0;
+    [alarm] f=0 -> 0.05 : (f'=0) + 0.95 : (f'=1);
+    [reset] f=1 -> 1.0 : (f'=0);
+endmodule
+
+module praesenz
+    p : [0..1] init 0;
+    [ankommen] p=0 -> 1.0 : (p'=1);
+    [gehen]    p=1 -> 1.0 : (p'=0);
+endmodule
